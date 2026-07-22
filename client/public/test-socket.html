@@ -1,0 +1,38 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Socket.IO Test</title>
+    <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
+</head>
+<body>
+    <h1>Socket.IO Connection Test</h1>
+    <div id="status" style="font-size:18px; margin-bottom:10px;"></div>
+    <script>
+        const statusDiv = document.getElementById('status');
+        statusDiv.textContent = 'Connecting to http://localhost:5000...';
+
+        const socket = io('http://localhost:5000', {
+          transports: ['websocket', 'polling']
+        });
+
+        socket.on('connect', () => {
+          statusDiv.innerHTML += `<span style="color:green;">✅ Connected! ID: ' + socket.id + '</span>';
+        });
+
+        socket.on('disconnect', () => {
+          statusDiv.innerHTML += '<br><span style="color:red;">❌ Disconnected!</span>';
+        });
+
+        socket.on('connect_error', (err) => {
+          statusDiv.innerHTML += `<br><span style="color:red;">❌ Connection error: ' + err.message + '</span>';
+        });
+
+        socket.onAny((eventName, ...args) => {
+          console.log('Received event:', eventName, args);
+        });
+
+    </script>
+</body>
+</html>
