@@ -48,7 +48,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({
     // console.log('🔌 Initializing socket for user:', currentUser);
     
     // Connect to socket server
-    socketRef.current = io('http://localhost:5000', {
+    socketRef.current = io('https://hrm-traxale.onrender.com', {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: 5,

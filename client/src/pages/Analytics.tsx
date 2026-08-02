@@ -39,8 +39,8 @@ interface RadarItem {
 
 interface RevenueItem {
   month: string;
-  revenue: number;
-  cost: number;
+  grossPayroll: number;
+  netPayroll: number;
 }
 
 export default function Analytics() {
@@ -58,6 +58,8 @@ export default function Analytics() {
     value: d.employees,
     color: ['#3B82F6', '#F97316', '#10B981', '#8B5CF6', '#EF4444', '#EC4899', '#06B6D4', '#F59E0B'][i],
   }));
+
+  const getTrendFromChange = (change: string) => change.trim().startsWith('-') ? 'down' : 'up';
 
   useEffect(() => {
     const fetchData = async () => {
@@ -95,10 +97,10 @@ export default function Analytics() {
 
   const kpiCards = dashboardStats 
     ? [
-        { title: 'Avg. Attendance Rate', value: dashboardStats.avgAttendance, change: dashboardStats.avgAttendanceChange, trend: 'up', icon: Clock, color: '#10B981' },
-        { title: 'Employee Satisfaction', value: dashboardStats.employeeSatisfaction, change: dashboardStats.employeeSatisfactionChange, trend: 'up', icon: Award, color: '#3B82F6' },
-        { title: 'Productivity Index', value: dashboardStats.productivityIndex, change: dashboardStats.productivityChange, trend: 'down', icon: Target, color: '#F97316' },
-        { title: 'Retention Rate', value: dashboardStats.retentionRate, change: dashboardStats.retentionChange, trend: 'up', icon: Users, color: '#8B5CF6' },
+        { title: 'Avg. Attendance Rate', value: dashboardStats.avgAttendance, change: dashboardStats.avgAttendanceChange, trend: getTrendFromChange(dashboardStats.avgAttendanceChange), icon: Clock, color: '#10B981' },
+        { title: 'Employee Satisfaction', value: dashboardStats.employeeSatisfaction, change: dashboardStats.employeeSatisfactionChange, trend: getTrendFromChange(dashboardStats.employeeSatisfactionChange), icon: Award, color: '#3B82F6' },
+        { title: 'Productivity Index', value: dashboardStats.productivityIndex, change: dashboardStats.productivityChange, trend: getTrendFromChange(dashboardStats.productivityChange), icon: Target, color: '#F97316' },
+        { title: 'Retention Rate', value: dashboardStats.retentionRate, change: dashboardStats.retentionChange, trend: getTrendFromChange(dashboardStats.retentionChange), icon: Users, color: '#8B5CF6' },
       ]
     : [];
 
@@ -158,7 +160,7 @@ export default function Analytics() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                 <XAxis dataKey="month" stroke="rgba(255,255,255,0.3)" fontSize={12} />
-                <YAxis stroke="rgba(255,255,255,0.3)" fontSize={12} domain={[80, 100]} />
+                <YAxis stroke="rgba(255,255,255,0.3)" fontSize={12} domain={[0, 100]} />
                 <Tooltip contentStyle={{ background: 'rgba(17, 24, 39, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff' }} />
                 <Area type="monotone" dataKey="rate" stroke="#3B82F6" strokeWidth={3} fill="url(#colorAtt)" />
               </AreaChart>
@@ -189,8 +191,8 @@ export default function Analytics() {
         </div>
 
         <div className="glass-card p-6 rounded-2xl">
-          <h3 className="text-lg font-bold mb-1" style={{ color: 'var(--text-primary)' }}>Revenue vs HR Cost</h3>
-          <p className="text-xs mb-6" style={{ color: 'var(--text-muted)' }}>Monthly comparison (in thousands)</p>
+          <h3 className="text-lg font-bold mb-1" style={{ color: 'var(--text-primary)' }}>Payroll Overview</h3>
+          <p className="text-xs mb-6" style={{ color: 'var(--text-muted)' }}>Gross vs net payroll by month (in thousands)</p>
           {revenueData.length > 0 ? (
             <ResponsiveContainer width="100%" height={250}>
               <LineChart data={revenueData}>
@@ -199,8 +201,8 @@ export default function Analytics() {
                 <YAxis stroke="rgba(255,255,255,0.3)" fontSize={12} />
                 <Tooltip contentStyle={{ background: 'rgba(17, 24, 39, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff' }} />
                 <Legend wrapperStyle={{ fontSize: '12px' }} />
-                <Line type="monotone" dataKey="revenue" stroke="#10B981" strokeWidth={3} dot={{ fill: '#10B981', r: 4 }} />
-                <Line type="monotone" dataKey="cost" stroke="#EF4444" strokeWidth={3} dot={{ fill: '#EF4444', r: 4 }} />
+                <Line type="monotone" dataKey="grossPayroll" name="Gross Payroll" stroke="#10B981" strokeWidth={3} dot={{ fill: '#10B981', r: 4 }} />
+                <Line type="monotone" dataKey="netPayroll" name="Net Payroll" stroke="#EF4444" strokeWidth={3} dot={{ fill: '#EF4444', r: 4 }} />
               </LineChart>
             </ResponsiveContainer>
           ) : (

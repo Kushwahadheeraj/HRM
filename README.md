@@ -114,7 +114,7 @@ cd traxale-hrm
    ```bash
    npm run dev
    ```
-   The backend will run on `http://localhost:5000`
+   The backend will run on `https://hrm-traxale.onrender.com`
 
 #### 3. Frontend Setup
 1. Navigate to the client directory in a new terminal:

@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: traxale-hrm-server
+    env: node
+    plan: starter
+    buildCommand: cd server && npm install && npm run build
+    startCommand: cd server && node dist/index.js
+    autoDeploy: true
+    branch: main
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGODB_URI
+        fromDatabase:
+          name: traxale-hrm-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRE
+        value: 30d
+databases:
+  - name: traxale-hrm-db
+    databaseName: traxale_hrm
+    user: traxale_hrm
+    plan: starter

@@ -337,7 +337,7 @@ export default function ChatWidget() {
                           {msg.files.map((file, i) => (
                             <a
                               key={i}
-                              href={`http://localhost:5000${file.url}`}
+                              href={`https://hrm-traxale.onrender.com${file.url}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex items-center gap-2 px-3 py-2 rounded-lg"

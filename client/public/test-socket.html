@@ -11,9 +11,9 @@
     <div id="status" style="font-size:18px; margin-bottom:10px;"></div>
     <script>
         const statusDiv = document.getElementById('status');
-        statusDiv.textContent = 'Connecting to http://localhost:5000...';
+        statusDiv.textContent = 'Connecting to https://hrm-traxale.onrender.com...';
 
-        const socket = io('http://localhost:5000', {
+        const socket = io('https://hrm-traxale.onrender.com', {
           transports: ['websocket', 'polling']
         });
 

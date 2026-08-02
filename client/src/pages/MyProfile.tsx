@@ -20,32 +20,33 @@ export default function MyProfile() {
   const isAdministrationUser = currentUser?.department === 'Administration';
 
   useEffect(() => {
-    if (currentUser?.employeeId) {
-      setLoading(true);
-      const promises = [employeesAPI.getByEmployeeId(currentUser.employeeId)];
-      if (!isAdministrationUser) {
-        promises.push(
-          attendanceAPI.getByEmployee(currentUser.employeeId),
-          leavesAPI.getByEmployee(currentUser.employeeId),
-          performanceAPI.getAll({ employeeId: currentUser.employeeId })
-        );
-      }
-      Promise.all(promises)
-        .then((results) => {
-          const empRes = results[0];
+    const fetchData = async () => {
+      if (currentUser?.employeeId) {
+        setLoading(true);
+        try {
+          const empRes = await employeesAPI.getByEmployeeId(currentUser.employeeId);
           if (empRes.success && empRes.data) {
             setEmployee(empRes.data);
           }
-          if (!isAdministrationUser && results.length > 1) {
-            const [, attRes, leaveRes, perfRes] = results;
+          if (!isAdministrationUser) {
+            const [attRes, leaveRes, perfRes] = await Promise.all([
+              attendanceAPI.getByEmployee(currentUser.employeeId),
+              leavesAPI.getByEmployee(currentUser.employeeId),
+              performanceAPI.getAll({ employeeId: currentUser.employeeId })
+            ]);
             if (attRes.success && attRes.data) setAttendanceHistory(attRes.data);
             if (leaveRes.success && leaveRes.data) setLeaveHistory(leaveRes.data);
             if (perfRes.success && perfRes.data) setPerformanceData(perfRes.data);
           }
-        })
-        .catch((err) => console.error('Error fetching profile data:', err))
-        .finally(() => setLoading(false));
-    }
+        } catch (err) {
+          console.error('Error fetching profile data:', err);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchData();
     
     // Get user location
     const getLocation = () => {

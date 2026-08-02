@@ -11,6 +11,8 @@ export interface ILeaveRequest extends Document {
   status: 'pending' | 'approved' | 'rejected';
   department: string;
   organizationId: mongoose.Types.ObjectId;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 const LeaveSchema: Schema = new Schema({
