@@ -5,40 +5,36 @@ import Organization from '../models/Organization.model';
 import Pricing from '../models/Pricing.model';
 import { ApiResponse } from '../types';
 import * as xlsx from 'xlsx';
-import bcrypt from 'bcrypt';
 import { sendWelcomeEmail } from '../utils/email';
 import { sendNewEmployeeNotification } from '../utils/slack';
+import { sendEmployeeWelcomeEmail } from '../services/emailService';
+import { generateSecurePassword, hashPassword } from '../utils/password';
+import { EmployeeWelcomeData } from '../templates/employeeWelcomeTemplate';
+import { env } from '../config/env';
 
-// Helper function to get employee limit for organization
 const getEmployeeLimit = async (organizationId: string): Promise<{ limit: number; current: number }> => {
-  // Get organization
   const org = await Organization.findById(organizationId);
   if (!org) {
     return { limit: 0, current: 0 };
   }
 
-  // Determine max allowed employees
   let maxEmployees = 0;
-  
+
   if (!org.isPaid) {
-    // Free trial: 25 employees (admin doesn't count)
     maxEmployees = 25;
   } else {
-    // Paid plan: get limit from pricing
     const pricing = await Pricing.findOne({ plan: org.plan || 'Basic' });
     if (pricing) {
       maxEmployees = pricing.employeeLimit;
     } else {
-      // Fallback
       maxEmployees = org.plan === 'Enterprise' ? -1 : org.plan === 'Pro' ? 500 : 50;
     }
   }
 
-  // Count current employees (exclude admin? Well, we'll count all employees)
   const currentEmployees = await Employee.countDocuments({ organizationId });
-  
+
   return {
-    limit: maxEmployees, // -1 = unlimited
+    limit: maxEmployees,
     current: currentEmployees
   };
 };
@@ -75,11 +71,14 @@ interface ExcelRow {
   Manager?: string;
   password?: string;
   Password?: string;
+  employmentType?: string;
+  officeLocation?: string;
+  shift?: string;
+  workingHours?: string;
+  reportingManager?: string;
 }
 
-// Helper function to map role to user role and role label
 const getRoleDetails = (role: string) => {
-  // SUPER IMPORTANT: Check for HR Manager MUST BE FIRST!
   if (role.toLowerCase().includes('hr')) {
     return { userRole: 'hr_manager', roleLabel: role.includes('HR Manager') ? 'HR Manager' : role };
   }
@@ -100,17 +99,14 @@ const getRoleDetails = (role: string) => {
     'Sales Manager': { userRole: 'team_manager', roleLabel: 'Sales Manager' },
   };
 
-  // Check if role is in roleMap, return that!
   if (roleMap[role]) {
     return roleMap[role];
   }
-  
-  // Check if it's a manager or lead otherwise, return team_manager
+
   if (role.toLowerCase().includes('manager') || role.toLowerCase().includes('lead')) {
     return { userRole: 'team_manager', roleLabel: role };
   }
 
-  // Default: return employee
   return { userRole: 'employee', roleLabel: role };
 };
 
@@ -123,7 +119,6 @@ export const getEmployees = async (req: Request, res: Response<ApiResponse>) => 
       data: employees,
     });
   } catch (error) {
-    // console.error('Get Employees Error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -149,7 +144,6 @@ export const getEmployee = async (req: Request, res: Response<ApiResponse>) => {
       data: employee,
     });
   } catch (error) {
-    // console.error('Get Employee Error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -164,18 +158,16 @@ export const getEmployeeByEmployeeId = async (req: Request, res: Response<ApiRes
     if (req.organizationId) {
       query.organizationId = req.organizationId;
     }
-    
+
     let employee = await Employee.findOne(query);
 
     if (!employee) {
-      // Check User model if Employee not found (for admin/hr users)
       let userQuery: any = { employeeId };
       if (req.organizationId) {
         userQuery.organizationId = req.organizationId;
       }
       const user = await User.findOne(userQuery);
       if (user) {
-        // Create a mock employee object using user data
         employee = {
           _id: user._id,
           name: user.name,
@@ -208,7 +200,6 @@ export const getEmployeeByEmployeeId = async (req: Request, res: Response<ApiRes
       data: employee,
     });
   } catch (error) {
-    // console.error('Get Employee By EmployeeId Error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -226,7 +217,6 @@ export const getEmployeesByManagerName = async (req: Request, res: Response<ApiR
       data: employees,
     });
   } catch (error) {
-    // console.error('Get Employees By Manager Error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -238,7 +228,6 @@ export const createEmployee = async (req: Request, res: Response<ApiResponse>) =
   try {
     const { password, ...employeeData } = req.body;
 
-    // Check if organizationId is provided
     if (!req.organizationId) {
       return res.status(400).json({
         success: false,
@@ -246,15 +235,6 @@ export const createEmployee = async (req: Request, res: Response<ApiResponse>) =
       });
     }
 
-     // Check if password is provided
-    if (!password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Password is required',
-      });
-    }
-
-    // Check employee limit
     const { limit, current } = await getEmployeeLimit(req.organizationId);
     if (limit !== -1 && current >= limit) {
       return res.status(400).json({
@@ -263,7 +243,6 @@ export const createEmployee = async (req: Request, res: Response<ApiResponse>) =
       });
     }
 
-    // Check if employee email already exists
     const query = { email: employeeData.email, organizationId: req.organizationId };
     const existingEmployee = await Employee.findOne(query);
     if (existingEmployee) {
@@ -273,10 +252,9 @@ export const createEmployee = async (req: Request, res: Response<ApiResponse>) =
       });
     }
 
-    // Get HR info (logged in user)
     const hrUserId = req.headers['x-user-id'] as string;
     const hrUser = await User.findById(hrUserId);
-    
+
     if (!hrUser) {
       return res.status(400).json({
         success: false,
@@ -284,20 +262,19 @@ export const createEmployee = async (req: Request, res: Response<ApiResponse>) =
       });
     }
 
-    // Create employee
+    const isPasswordAutoGenerated = !password;
+    const temporaryPassword = password || generateSecurePassword(12);
+
+    const hashedPassword = await hashPassword(temporaryPassword, 10);
+
     const employeeDataWithOrg = { ...employeeData, organizationId: req.organizationId };
     const newEmployee = await Employee.create(employeeDataWithOrg);
 
-    // Hash password
-    const passwordToHash = password;
-    const hashedPassword = await bcrypt.hash(passwordToHash, 10);
-
-    // Create corresponding user for login
     const { userRole, roleLabel } = getRoleDetails(employeeData.role || 'Employee');
     await User.create({
       name: employeeData.name,
       email: employeeData.email,
-      password: hashedPassword, // Use hashed password
+      password: hashedPassword,
       role: userRole,
       roleLabel: roleLabel,
       department: employeeData.department,
@@ -306,38 +283,73 @@ export const createEmployee = async (req: Request, res: Response<ApiResponse>) =
       phone: employeeData.phone,
       manager: employeeData.manager,
       organizationId: req.organizationId,
+      mustChangePassword: true,
+      temporaryPasswordSet: true,
     });
 
-    // Send welcome email (don't block the response)
+    const welcomeEmailData: EmployeeWelcomeData = {
+      employeeName: employeeData.name,
+      employeeId: employeeData.employeeId,
+      email: employeeData.email,
+      temporaryPassword: temporaryPassword,
+      department: employeeData.department || 'General',
+      designation: employeeData.role || 'Employee',
+      role: roleLabel,
+      managerName: employeeData.manager,
+      salary: employeeData.salary,
+      joiningDate: employeeData.joinDate,
+      employmentType: employeeData.employmentType || 'Full-Time',
+      officeLocation: employeeData.officeLocation,
+      phoneNumber: employeeData.phone,
+      reportingManager: employeeData.reportingManager || employeeData.manager,
+      shift: employeeData.shift || 'General',
+      workingHours: employeeData.workingHours || '9:00 AM - 6:00 PM',
+      employeeStatus: employeeData.status || 'active',
+      loginUrl: env.LOGIN_URL,
+      hrName: hrUser.name,
+      hrEmail: hrUser.email,
+    };
+
+    const emailResult = await sendEmployeeWelcomeEmail({
+      ...welcomeEmailData,
+      employeeId: newEmployee._id.toString(),
+      organizationId: req.organizationId,
+    });
+
     sendWelcomeEmail(
-      employeeData.email, 
-      employeeData.name, 
-      passwordToHash, 
+      employeeData.email,
+      employeeData.name,
+      temporaryPassword,
       roleLabel,
       hrUser.name,
       hrUser.email
-    ).catch(err => {
-      // console.error('Error sending email:', err);
-    });
+    ).catch(() => {});
 
-    // Send Slack notification (don't block the response)
     sendNewEmployeeNotification(
       employeeData.name,
       employeeData.email,
       roleLabel,
       employeeData.department || 'Not specified',
       hrUser.name
-    ).catch(err => {
-      // console.error('Error sending Slack notification:', err);
-    });
+    ).catch(() => {});
 
-    res.status(201).json({
+    let responseMessage = 'Employee created successfully';
+    if (emailResult.success) {
+      responseMessage = 'Employee created successfully. Welcome email sent successfully.';
+    } else {
+      responseMessage = 'Employee created successfully. Email could not be sent.';
+    }
+
+    const responseData: any = {
       success: true,
-      message: 'Employee created successfully',
+      message: responseMessage,
       data: newEmployee,
-    });
+      passwordAutoGenerated: isPasswordAutoGenerated,
+      emailSent: emailResult.success,
+    };
+
+    res.status(201).json(responseData);
   } catch (error) {
-    // console.error('Create Employee Error:', error);
     res.status(500).json({
       success: false,
       message: (error as Error).message || 'Internal server error',
@@ -354,7 +366,6 @@ export const bulkImportEmployees = async (req: Request, res: Response<ApiRespons
       });
     }
 
-    // Check organization ID
     if (!req.organizationId) {
       return res.status(400).json({
         success: false,
@@ -362,7 +373,6 @@ export const bulkImportEmployees = async (req: Request, res: Response<ApiRespons
       });
     }
 
-    // Check employee limit first
     const { limit, current } = await getEmployeeLimit(req.organizationId);
     if (limit === 0) {
       return res.status(400).json({
@@ -371,10 +381,9 @@ export const bulkImportEmployees = async (req: Request, res: Response<ApiRespons
       });
     }
 
-    // Get HR info (logged in user)
     const hrUserId = req.headers['x-user-id'] as string;
     const hrUser = await User.findById(hrUserId);
-    
+
     if (!hrUser) {
       return res.status(400).json({
         success: false,
@@ -382,7 +391,6 @@ export const bulkImportEmployees = async (req: Request, res: Response<ApiRespons
       });
     }
 
-    // Get uploaded file
     const file: any = req.files.file;
     const workbook = xlsx.read(file.data, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
@@ -394,7 +402,6 @@ export const bulkImportEmployees = async (req: Request, res: Response<ApiRespons
     let currentCount = current;
 
     for (const row of sheetData as ExcelRow[]) {
-      // Check limit before creating each employee
       if (limit !== -1 && currentCount >= limit) {
         results.push({
           row,
@@ -405,7 +412,6 @@ export const bulkImportEmployees = async (req: Request, res: Response<ApiRespons
         continue;
       }
       try {
-        // Map Excel columns to employee fields
         const employeeData = {
           name: row.name || row.Name || row['Full Name'],
           email: row.email || row.Email,
@@ -420,10 +426,19 @@ export const bulkImportEmployees = async (req: Request, res: Response<ApiRespons
           performance: Number(row.performance || row.Performance || 50),
           manager: row.manager || row.Manager,
           organizationId: req.organizationId,
+          employmentType: row.employmentType || 'Full-Time',
+          officeLocation: row.officeLocation || '',
+          shift: row.shift || 'General',
+          workingHours: row.workingHours || '9:00 AM - 6:00 PM',
+          reportingManager: row.reportingManager || row.manager || '',
         };
-        const passwordToHash = (row.password || row.Password) as string;
 
-        // Check required fields
+        let passwordToHash = (row.password || row.Password) as string;
+        const isAutoGenerated = !passwordToHash;
+        if (!passwordToHash) {
+          passwordToHash = generateSecurePassword(12);
+        }
+
         if (!employeeData.name || !employeeData.email || !employeeData.employeeId || !employeeData.organizationId || !passwordToHash) {
           results.push({
             row,
@@ -434,7 +449,6 @@ export const bulkImportEmployees = async (req: Request, res: Response<ApiRespons
           continue;
         }
 
-        // Check if employee email already exists
         const query = req.organizationId ? { email: employeeData.email, organizationId: req.organizationId } : { email: employeeData.email };
         const existingEmployee = await Employee.findOne(query);
         if (existingEmployee) {
@@ -447,19 +461,16 @@ export const bulkImportEmployees = async (req: Request, res: Response<ApiRespons
           continue;
         }
 
-        // Create employee
         const newEmployee = await Employee.create(employeeData);
 
-        // Hash password
-        const hashedPassword = await bcrypt.hash(passwordToHash, 10);
+        const hashedPassword = await hashPassword(passwordToHash, 10);
 
-        // Create corresponding user for login
         const { userRole, roleLabel } = getRoleDetails(employeeData.role);
-        
+
         await User.create({
           name: employeeData.name,
           email: employeeData.email,
-          password: hashedPassword, // Use hashed password
+          password: hashedPassword,
           role: userRole,
           roleLabel: roleLabel,
           department: employeeData.department,
@@ -467,40 +478,65 @@ export const bulkImportEmployees = async (req: Request, res: Response<ApiRespons
           employeeId: employeeData.employeeId,
           phone: employeeData.phone,
           organizationId: req.organizationId,
+          mustChangePassword: true,
+          temporaryPasswordSet: true,
         });
 
-        // Send welcome email
+        const welcomeEmailData: EmployeeWelcomeData = {
+          employeeName: employeeData.name,
+          employeeId: employeeData.employeeId,
+          email: employeeData.email,
+          temporaryPassword: passwordToHash,
+          department: employeeData.department || 'General',
+          designation: employeeData.role,
+          role: roleLabel,
+          managerName: employeeData.manager,
+          salary: employeeData.salary,
+          joiningDate: employeeData.joinDate || new Date().toISOString().split('T')[0],
+          employmentType: employeeData.employmentType,
+          officeLocation: employeeData.officeLocation,
+          phoneNumber: employeeData.phone,
+          reportingManager: employeeData.reportingManager,
+          shift: employeeData.shift,
+          workingHours: employeeData.workingHours,
+          employeeStatus: employeeData.status || 'active',
+          loginUrl: env.LOGIN_URL,
+          hrName: hrUser.name,
+          hrEmail: hrUser.email,
+        };
+
+        sendEmployeeWelcomeEmail({
+          ...welcomeEmailData,
+          employeeId: newEmployee._id.toString(),
+          organizationId: req.organizationId,
+        }).catch(() => {});
+
         sendWelcomeEmail(
-          employeeData.email, 
-          employeeData.name, 
-          passwordToHash, 
+          employeeData.email,
+          employeeData.name,
+          passwordToHash,
           roleLabel,
           hrUser.name,
           hrUser.email
-        ).catch(err => {
-          // console.error('Error sending email:', err);
-        });
+        ).catch(() => {});
 
-        // Send Slack notification
         sendNewEmployeeNotification(
           employeeData.name,
           employeeData.email,
           roleLabel,
           employeeData.department || 'Not specified',
           hrUser.name
-        ).catch(err => {
-          // console.error('Error sending Slack notification:', err);
-        });
+        ).catch(() => {});
 
         results.push({
           row,
           success: true,
           message: 'Employee created successfully',
+          passwordAutoGenerated: isAutoGenerated,
         });
         successCount++;
         currentCount++;
       } catch (rowError) {
-        // console.error('Error importing row:', rowError);
         results.push({
           row,
           success: false,
@@ -520,7 +556,6 @@ export const bulkImportEmployees = async (req: Request, res: Response<ApiRespons
       },
     });
   } catch (error) {
-    // console.error('Bulk Import Error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -533,10 +568,9 @@ export const updateEmployee = async (req: Request, res: Response<ApiResponse>) =
     const { id } = req.params;
     const { password, ...employeeData } = req.body;
 
-    // Find employee first with organizationId
     const findQuery = req.organizationId ? { _id: id, organizationId: req.organizationId } : { _id: id };
     const existingEmployee = await Employee.findOne(findQuery);
-    
+
     if (!existingEmployee) {
       return res.status(404).json({
         success: false,
@@ -544,7 +578,6 @@ export const updateEmployee = async (req: Request, res: Response<ApiResponse>) =
       });
     }
 
-    // Update employee
     const updatedEmployee = await Employee.findByIdAndUpdate(id, employeeData, {
       new: true,
       runValidators: true,
@@ -557,7 +590,6 @@ export const updateEmployee = async (req: Request, res: Response<ApiResponse>) =
       });
     }
 
-    // Prepare user update object
     const userUpdateData: any = {
       name: employeeData.name,
       email: employeeData.email,
@@ -566,12 +598,10 @@ export const updateEmployee = async (req: Request, res: Response<ApiResponse>) =
       phone: employeeData.phone,
     };
 
-    // Hash password if provided
     if (password) {
-      userUpdateData.password = await bcrypt.hash(password, 10);
+      userUpdateData.password = await hashPassword(password, 10);
     }
 
-    // Update corresponding user with organizationId
     const userQuery = req.organizationId ? { employeeId: updatedEmployee.employeeId, organizationId: req.organizationId } : { employeeId: updatedEmployee.employeeId };
     await User.findOneAndUpdate(
       userQuery,
@@ -584,7 +614,6 @@ export const updateEmployee = async (req: Request, res: Response<ApiResponse>) =
       data: updatedEmployee,
     });
   } catch (error) {
-    // console.error('Update Employee Error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -595,11 +624,10 @@ export const updateEmployee = async (req: Request, res: Response<ApiResponse>) =
 export const deleteEmployee = async (req: Request, res: Response<ApiResponse>) => {
   try {
     const { id } = req.params;
-    
-    // Find employee first with organizationId
+
     const findQuery = req.organizationId ? { _id: id, organizationId: req.organizationId } : { _id: id };
     const existingEmployee = await Employee.findOne(findQuery);
-    
+
     if (!existingEmployee) {
       return res.status(404).json({
         success: false,
@@ -607,7 +635,6 @@ export const deleteEmployee = async (req: Request, res: Response<ApiResponse>) =
       });
     }
 
-    // Now delete
     const deletedEmployee = await Employee.findByIdAndDelete(id);
 
     if (!deletedEmployee) {
@@ -617,7 +644,6 @@ export const deleteEmployee = async (req: Request, res: Response<ApiResponse>) =
       });
     }
 
-    // Also delete corresponding user with organizationId
     const userQuery = req.organizationId ? { employeeId: deletedEmployee.employeeId, organizationId: req.organizationId } : { employeeId: deletedEmployee.employeeId };
     await User.findOneAndDelete(userQuery);
 
@@ -626,7 +652,6 @@ export const deleteEmployee = async (req: Request, res: Response<ApiResponse>) =
       message: 'Employee deleted successfully',
     });
   } catch (error) {
-    // console.error('Delete Employee Error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',

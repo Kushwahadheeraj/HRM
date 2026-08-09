@@ -62,17 +62,23 @@ export const login = async (req: Request, res: Response<ApiResponse>) => {
       });
     }
 
-    // Update last login time
     user.lastLogin = new Date();
     await user.save();
 
-    // console.log('Login successful for:', user.email);
     const userJson = user.toJSON();
-    // console.log('userJson:', userJson);
+    const responseData: any = userJson;
+    responseData.mustChangePassword = user.mustChangePassword || false;
+    responseData.temporaryPasswordSet = user.temporaryPasswordSet || false;
+
+    let loginMessage = 'Login successful';
+    if (user.mustChangePassword) {
+      loginMessage = 'Login successful. Please change your password immediately.';
+    }
+
     res.json({
       success: true,
-      message: 'Login successful',
-      data: userJson,
+      message: loginMessage,
+      data: responseData,
     });
   } catch (error) {
     console.error('Login Error:', error);
@@ -265,14 +271,14 @@ export const getSuperAdmin = async (req: Request, res: Response<ApiResponse>) =>
 export const updateSettings = async (req: Request, res: Response<ApiResponse>) => {
   try {
     const { userId } = req.params;
-    const updateData = req.body;
+    const updateData: any = req.body;
 
-    // If password is being updated, hash it
     if (updateData.password) {
       updateData.password = await bcrypt.hash(updateData.password, 10);
+      updateData.mustChangePassword = false;
+      updateData.temporaryPasswordSet = false;
     }
 
-    // Update user in DB
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       updateData,
@@ -288,7 +294,7 @@ export const updateSettings = async (req: Request, res: Response<ApiResponse>) =
 
     res.json({
       success: true,
-      message: 'Settings updated successfully',
+      message: updateData.password ? 'Password updated successfully.' : 'Settings updated successfully',
       data: updatedUser,
     });
   } catch (error) {

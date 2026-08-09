@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../App';
 import { useCurrency } from '../lib/currency';
 import { authAPI, reviewsAPI } from '../lib/api';
-import { ArrowRight, Zap, Shield, Globe, Brain, Clock, Users, BarChart3, CheckCircle2, Star, ChevronRight, Sparkles, Fingerprint, MapPin, QrCode, Bot, TrendingUp, Calendar, Download } from 'lucide-react';
+import { ArrowRight, Zap, Shield, Globe, Brain, Clock, Users, BarChart3, CheckCircle2, Star, ChevronRight, Sparkles, Fingerprint, MapPin, QrCode, Bot, TrendingUp, Calendar, Download, Menu, X, Sun, Moon } from 'lucide-react';
 
 const features = [
   { icon: Fingerprint, title: 'Face Recognition', desc: 'AI-powered biometric attendance with 99.9% accuracy' },
@@ -43,6 +43,7 @@ export default function Landing() {
   const [pricing, setPricing] = useState<any[]>([]);
   const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Fetch pricing and reviews from API
   useEffect(() => {
@@ -82,11 +83,13 @@ export default function Landing() {
   }, []);
 
   const handleFreeTrial = () => {
+    setMobileMenuOpen(false);
     setRegisterMode('free-trial');
     setCurrentPage('register-admin');
   };
 
   const handleGetStarted = (planKey: 'Basic' | 'Pro' | 'Enterprise' = 'Pro') => {
+    setMobileMenuOpen(false);
     setRegisterMode('paid');
     setRegisterPlan(planKey);
     setCurrentPage('register-admin');
@@ -94,26 +97,73 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen hero-grid" style={{ background: 'var(--bg-primary)' }}>
-      <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4" style={{ background: theme === 'dark' ? 'rgba(4, 8, 16, 0.85)' : 'rgba(248, 250, 252, 0.85)', backdropFilter: 'blur(20px)', borderBottom: '1px solid var(--border-color)' }}>
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="Traxale Logo" className="w-10 h-10 rounded-xl neon-glow" />
-            <h1 className="text-xl font-bold gradient-text">Traxale Private Limited</h1>
+      <nav className="fixed top-0 left-0 right-0 z-50 px-4 py-3 sm:px-6 sm:py-4" style={{ background: theme === 'dark' ? 'rgba(4, 8, 16, 0.85)' : 'rgba(248, 250, 252, 0.85)', backdropFilter: 'blur(20px)', borderBottom: '1px solid var(--border-color)' }}>
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <img src="/logo.png" alt="Traxale Logo" className="h-12 w-12 rounded-xl neon-glow sm:h-14 sm:w-14 md:h-16 md:w-16" />
+              <h1 className="hidden text-xl font-bold gradient-text md:block">Traxale Private Limited</h1>
+            </div>
+            <div className="hidden md:flex items-center gap-8">
+              <a href="#features" className="text-sm font-medium transition-colors hover:text-electric" style={{ color: 'var(--text-secondary)' }}>Features</a>
+              <a href="#pricing" className="text-sm font-medium transition-colors hover:text-electric" style={{ color: 'var(--text-secondary)' }}>Pricing</a>
+              <a href="#testimonials" className="text-sm font-medium transition-colors hover:text-electric" style={{ color: 'var(--text-secondary)' }}>Testimonials</a>
+            </div>
+            <div className="hidden md:flex items-center gap-3">
+              <button onClick={toggleTheme} className="p-2 rounded-lg" style={{ color: 'var(--text-muted)' }}>{theme === 'dark' ? '☀️' : '🌙'}</button>
+              <a href="/traxale-app.apk" download className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl transition-all hover:scale-105" style={{ background: 'var(--bg-glass)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}>
+                <Download size={16} />
+                Download App
+              </a>
+              <button onClick={() => setCurrentPage('login')} className="px-4 py-2 text-sm font-medium rounded-xl transition-all hover:scale-105" style={{ color: 'var(--text-primary)' }}>Sign In</button>
+              <button onClick={handleFreeTrial} className="px-5 py-2.5 text-sm font-semibold rounded-xl text-white transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/25" style={{ background: 'linear-gradient(135deg, #3B82F6, #2563EB)' }}>Start Free Trial</button>
+            </div>
+            <div className="flex items-center gap-2 md:hidden">
+                  <button
+                    type="button"
+                    onClick={toggleTheme}
+                    className="flex items-center justify-center rounded-xl p-2.5"
+                    style={{ background: 'var(--bg-glass)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+                    aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                  >
+                    {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+                  </button>
+              <a
+                href="/traxale-app.apk"
+                download
+                className="flex items-center justify-center rounded-xl p-2.5"
+                style={{ background: 'var(--bg-glass)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+                aria-label="Download App"
+              >
+                <Download size={18} className='mr-2' />
+                Download App
+              </a>
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen((prev) => !prev)}
+                className="flex items-center justify-center rounded-xl p-2.5"
+                style={{ background: 'var(--bg-glass)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+                aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+                aria-expanded={mobileMenuOpen}
+              >
+                {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+              </button>
+            </div>
           </div>
-          <div className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-sm font-medium transition-colors hover:text-electric" style={{ color: 'var(--text-secondary)' }}>Features</a>
-            <a href="#pricing" className="text-sm font-medium transition-colors hover:text-electric" style={{ color: 'var(--text-secondary)' }}>Pricing</a>
-            <a href="#testimonials" className="text-sm font-medium transition-colors hover:text-electric" style={{ color: 'var(--text-secondary)' }}>Testimonials</a>
-          </div>
-          <div className="flex items-center gap-3">
-            <button onClick={toggleTheme} className="p-2 rounded-lg" style={{ color: 'var(--text-muted)' }}>{theme === 'dark' ? '☀️' : '🌙'}</button>
-            <a href="/traxale-app.apk" download className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl transition-all hover:scale-105" style={{ background: 'var(--bg-glass)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}>
-              <Download size={16} />
-              Download App
-            </a>
-            <button onClick={() => setCurrentPage('login')} className="px-4 py-2 text-sm font-medium rounded-xl transition-all hover:scale-105" style={{ color: 'var(--text-primary)' }}>Sign In</button>
-            <button onClick={handleFreeTrial} className="px-5 py-2.5 text-sm font-semibold rounded-xl text-white transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/25" style={{ background: 'linear-gradient(135deg, #3B82F6, #2563EB)' }}>Start Free Trial</button>
-          </div>
+          {mobileMenuOpen && (
+            <div className="mt-3 rounded-2xl p-4 md:hidden" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
+              <div className="flex flex-col gap-2">
+                <a href="#features" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-3 py-2 text-sm font-medium transition-colors" style={{ color: 'var(--text-secondary)' }}>Features</a>
+                <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-3 py-2 text-sm font-medium transition-colors" style={{ color: 'var(--text-secondary)' }}>Pricing</a>
+                <a href="#testimonials" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-3 py-2 text-sm font-medium transition-colors" style={{ color: 'var(--text-secondary)' }}>Testimonials</a>
+              </div>
+              <div className="my-4 h-px" style={{ background: 'var(--border-color)' }} />
+              <div className="flex flex-col gap-3">
+                <button onClick={() => { setMobileMenuOpen(false); setCurrentPage('login'); }} className="rounded-xl px-4 py-3 text-sm font-medium" style={{ background: 'var(--bg-glass)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}>Sign In</button>
+                <button onClick={handleFreeTrial} className="rounded-xl px-4 py-3 text-sm font-semibold text-white" style={{ background: 'linear-gradient(135deg, #3B82F6, #2563EB)' }}>Start Free Trial</button>
+              </div>
+            </div>
+          )}
         </div>
       </nav>
 

@@ -16,7 +16,8 @@ export interface IUser extends Document {
   organizationId?: mongoose.Types.ObjectId;
   createdAt?: Date;
   updatedAt?: Date;
-  // New fields for settings
+  mustChangePassword?: boolean;
+  temporaryPasswordSet?: boolean;
   theme?: string;
   accentColor?: string;
   notifications?: {
@@ -52,6 +53,8 @@ const UserSchema: Schema = new Schema({
   shiftId: { type: Schema.Types.ObjectId, ref: 'Shift' },
   manager: { type: String },
   organizationId: { type: Schema.Types.ObjectId, ref: 'Organization' },
+  mustChangePassword: { type: Boolean, default: false },
+  temporaryPasswordSet: { type: Boolean, default: false },
   theme: { type: String, default: 'dark' },
   accentColor: { type: String, default: '#3B82F6' },
   notifications: {
@@ -78,7 +81,19 @@ UserSchema.virtual('id').get(function(this: IUser) {
   return this._id.toHexString();
 });
 
-UserSchema.set('toJSON', { virtuals: true });
-UserSchema.set('toObject', { virtuals: true });
+UserSchema.set('toJSON', {
+  virtuals: true,
+  transform: function(_doc, ret) {
+    delete ret.password;
+    return ret;
+  }
+});
+UserSchema.set('toObject', {
+  virtuals: true,
+  transform: function(_doc, ret) {
+    delete ret.password;
+    return ret;
+  }
+});
 
 export default mongoose.model<IUser>('User', UserSchema);

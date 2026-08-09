@@ -177,6 +177,7 @@ export interface ApiResponse<T = any> {
   success: boolean;
   message?: string;
   data?: T;
+  [key: string]: any;
 }
 
 export type ThemeMode = 'dark' | 'light';

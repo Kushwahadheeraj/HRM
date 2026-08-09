@@ -8,18 +8,22 @@ export interface IOrganization extends Document {
   isPaid: boolean;
   paymentDate?: Date;
   plan?: 'Basic' | 'Pro' | 'Enterprise';
-  // Office settings
   officeLocation?: {
     latitude: number;
     longitude: number;
     address?: string;
-    radius: number; // in meters
+    radius: number;
   };
-  // Attendance time settings
   attendanceSettings?: {
-    checkInTime: string; // e.g., '09:00'
-    checkOutTime: string; // e.g., '18:00'
-    lateThreshold: string; // e.g., '09:15'
+    checkInTime: string;
+    checkOutTime: string;
+    lateThreshold: string;
+    geofencingEnabled: boolean;
+    strictGeofenceEnforcement: boolean;
+    autoClockOutOnExit: boolean;
+    requireOutOfOfficeApproval: boolean;
+    allowedGraceRadius: number;
+    notifyHROnViolation: boolean;
   };
   createdAt?: Date;
   updatedAt?: Date;
@@ -37,22 +41,47 @@ const OrganizationSchema: Schema = new Schema({
     latitude: { type: Number },
     longitude: { type: Number },
     address: { type: String },
-    radius: { type: Number, default: 100 } // default 100 meters
+    radius: { type: Number, default: 100 },
   },
   attendanceSettings: {
     checkInTime: { type: String, default: '09:00' },
     checkOutTime: { type: String, default: '18:00' },
-    lateThreshold: { type: String, default: '09:15' }
-  }
+    lateThreshold: { type: String, default: '09:15' },
+    geofencingEnabled: { type: Boolean, default: true },
+    strictGeofenceEnforcement: { type: Boolean, default: true },
+    autoClockOutOnExit: { type: Boolean, default: true },
+    requireOutOfOfficeApproval: { type: Boolean, default: true },
+    allowedGraceRadius: { type: Number, default: 50 },
+    notifyHROnViolation: { type: Boolean, default: true },
+  },
 }, { timestamps: true });
 
-// Calculate trial end date (30 days from start)
 OrganizationSchema.pre<IOrganization>('save', function(next) {
   if (this.isNew || this.isModified('trialStartDate')) {
     const trialStart = this.trialStartDate || new Date();
     const trialEnd = new Date(trialStart);
-    trialEnd.setDate(trialEnd.getDate() + 30); // Add 30 days
+    trialEnd.setDate(trialEnd.getDate() + 30);
     this.trialEndDate = trialEnd;
+  }
+  if (!this.attendanceSettings) {
+    this.attendanceSettings = {
+      checkInTime: '09:00',
+      checkOutTime: '18:00',
+      lateThreshold: '09:15',
+      geofencingEnabled: true,
+      strictGeofenceEnforcement: true,
+      autoClockOutOnExit: true,
+      requireOutOfOfficeApproval: true,
+      allowedGraceRadius: 50,
+      notifyHROnViolation: true,
+    };
+  } else {
+    if (typeof this.attendanceSettings.geofencingEnabled === 'undefined') this.attendanceSettings.geofencingEnabled = true;
+    if (typeof this.attendanceSettings.strictGeofenceEnforcement === 'undefined') this.attendanceSettings.strictGeofenceEnforcement = true;
+    if (typeof this.attendanceSettings.autoClockOutOnExit === 'undefined') this.attendanceSettings.autoClockOutOnExit = true;
+    if (typeof this.attendanceSettings.requireOutOfOfficeApproval === 'undefined') this.attendanceSettings.requireOutOfOfficeApproval = true;
+    if (typeof this.attendanceSettings.allowedGraceRadius === 'undefined') this.attendanceSettings.allowedGraceRadius = 50;
+    if (typeof this.attendanceSettings.notifyHROnViolation === 'undefined') this.attendanceSettings.notifyHROnViolation = true;
   }
   next();
 });

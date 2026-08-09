@@ -347,10 +347,10 @@ server.listen(PORT, () => {
   console.log(`
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
-║   🚀 TRAXALE HRM SERVER                                    ║
+║   🚀 TRAXALE HRM SERVER                                  ║
 ║                                                           ║
-║   Server is running on: http://localhost:${PORT}            ║
-║   Environment: ${process.env.NODE_ENV || 'development'}         ║
+║   Server is running on: http://localhost:${PORT}              ║
+║   Environment: ${process.env.NODE_ENV || 'development'}             ║
 ║   MongoDB: Connected                                      ║
 ║   Socket.io: Active                                       ║
 ║                                                           ║
