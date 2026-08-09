@@ -213,12 +213,12 @@ export default function Login() {
                   <button type="submit" disabled={loading} className="w-full py-4 rounded-xl text-white font-semibold transition-all hover:scale-[1.02] hover:shadow-lg active:scale-[0.98]" style={{ background: selectedRoleData?.gradient || 'linear-gradient(135deg, #3B82F6, #2563EB)' }}>
                     {loading ? 'Signing in...' : <span className="flex items-center justify-center gap-2"><Lock size={16} /> Sign In</span>}
                   </button>
-                  <div className="text-center text-sm mt-4" style={{ color: 'var(--text-muted)' }}>
+                  {/* <div className="text-center text-sm mt-4" style={{ color: 'var(--text-muted)' }}>
                     Don't have an account?{' '}
                     <button onClick={() => setStep('register')} style={{ color: '#3B82F6' }} className="font-semibold hover:underline">
                       Sign Up
-                    </button>
-                  </div>
+                    </button> */}
+                  {/* </div> */}
                 </form>
               </div>
             </div>

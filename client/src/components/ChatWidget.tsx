@@ -19,10 +19,11 @@ export default function ChatWidget() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { currentUser } = useApp();
 
-  // Hide chat for super admin and Administration users
-  const isSuperAdmin = currentUser?.email === 'dheeraj01072001@gmail.com';
+  // Hide chat for super admin, HR, and Administration users
+  const isSuperAdmin = currentUser?.email === 'dheeraj01072001@gmail.com' || currentUser?.role === 'super_admin';
   const isAdministrationUser = currentUser?.department === 'Administration';
-  if (isSuperAdmin || isAdministrationUser) return null;
+  const isHrUser = currentUser?.role === 'hr_manager';
+  if (isSuperAdmin || isAdministrationUser || isHrUser) return null;
 
   // Get display name for channel
   const getChannelDisplayName = (channel: Channel) => {

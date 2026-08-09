@@ -316,14 +316,15 @@ export const createEmployee = async (req: Request, res: Response<ApiResponse>) =
       organizationId: req.organizationId,
     });
 
-    sendWelcomeEmail(
-      employeeData.email,
-      employeeData.name,
-      temporaryPassword,
-      roleLabel,
-      hrUser.name,
-      hrUser.email
-    ).catch(() => {});
+    // Note: Old Gmail/Nodemailer SMTP welcome email disabled in favor of Brevo API
+    // sendWelcomeEmail(
+    //   employeeData.email,
+    //   employeeData.name,
+    //   temporaryPassword,
+    //   roleLabel,
+    //   hrUser.name,
+    //   hrUser.email
+    // ).catch(() => {});
 
     sendNewEmployeeNotification(
       employeeData.name,
@@ -511,14 +512,15 @@ export const bulkImportEmployees = async (req: Request, res: Response<ApiRespons
           organizationId: req.organizationId,
         }).catch(() => {});
 
-        sendWelcomeEmail(
-          employeeData.email,
-          employeeData.name,
-          passwordToHash,
-          roleLabel,
-          hrUser.name,
-          hrUser.email
-        ).catch(() => {});
+        // Note: Old Gmail/Nodemailer SMTP welcome email disabled in favor of Brevo API
+        // sendWelcomeEmail(
+        //   employeeData.email,
+        //   employeeData.name,
+        //   passwordToHash,
+        //   roleLabel,
+        //   hrUser.name,
+        //   hrUser.email
+        // ).catch(() => {});
 
         sendNewEmployeeNotification(
           employeeData.name,

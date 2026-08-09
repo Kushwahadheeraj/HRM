@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../App';
-import { Search, Mail, Phone, Building2, MapPin, MessageCircle, X, Send } from 'lucide-react';
-import { employeesAPI, messagesAPI } from '../lib/api';
+import { Search, Mail, Phone, Building2, MapPin, X } from 'lucide-react';
+import { employeesAPI } from '../lib/api';
 import { getInitials, getAvatarColor } from '../lib/data';
-import { Employee, Message } from '../lib/types';
+import { Employee } from '../lib/types';
 
 const managerRoles = ['HR Manager', 'Product Manager', 'Sales Manager', 'Project Manager', 'Team Manager'];
 
@@ -13,8 +13,6 @@ export default function TeamView() {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Employee | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState<Message[]>([]);
 
   useEffect(() => {
     const fetchEmployees = async () => {
@@ -31,12 +29,9 @@ export default function TeamView() {
   }, []);
 
   const isManager = currentUser && managerRoles.includes(currentUser.roleLabel);
-  
-  // Find current user in employees to get their manager
+
   const currentEmployee = employees.find(e => e.employeeId === currentUser?.employeeId);
-  
-  // For managers: show their team
-  // For regular employees: show employees with same manager + themselves
+
   const teamMembers = isManager
     ? employees.filter(e => e.manager === currentUser.name)
     : currentEmployee
@@ -52,55 +47,6 @@ export default function TeamView() {
   );
 
   const statusColor = (s: string) => s === 'active' ? '#10B981' : s === 'remote' ? '#3B82F6' : s === 'on-leave' ? '#F59E0B' : '#64748B';
-
-  const handleSendMessage = async () => {
-    if (!selected || !message.trim() || !currentUser) return;
-    try {
-      const recipientEmployee = employees.find(e => e.id === selected.id);
-      if (!recipientEmployee) return;
-      const recipientRes = await employeesAPI.getByEmployeeId(recipientEmployee.employeeId);
-      if (recipientRes.success && recipientRes.data) {
-        const recipientId = recipientRes.data.id || recipientRes.data._id;
-        if (!recipientId) return;
-        await messagesAPI.sendMessage({
-          from: currentUser.id || '',
-          to: recipientId,
-          content: message
-        });
-        setMessage('');
-        if (currentUser.id && recipientId) {
-          const msgsRes = await messagesAPI.getMessages(currentUser.id, recipientId);
-          if (msgsRes.success && msgsRes.data) {
-            setMessages(msgsRes.data);
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error sending message:", error);
-    }
-  };
-
-  useEffect(() => {
-    const fetchMessages = async () => {
-      if (!selected || !currentUser) return;
-      try {
-        const recipientEmployee = employees.find(e => e.id === selected.id);
-        if (!recipientEmployee) return;
-        const recipientRes = await employeesAPI.getByEmployeeId(recipientEmployee.employeeId);
-        if (recipientRes.success && recipientRes.data && currentUser.id) {
-          const recipientId = recipientRes.data.id || recipientRes.data._id;
-          if (!recipientId) return;
-          const msgsRes = await messagesAPI.getMessages(currentUser.id, recipientId);
-          if (msgsRes.success && msgsRes.data) {
-            setMessages(msgsRes.data);
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching messages:", error);
-      }
-    };
-    fetchMessages();
-  }, [selected, currentUser, employees]);
 
   return (
     <div className="space-y-6">
@@ -154,14 +100,13 @@ export default function TeamView() {
               <div className="flex items-center gap-2"><Mail size={12} style={{ color: 'var(--text-muted)' }} /><span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{emp.email}</span></div>
             </div>
             {isManager && (
-              <div className="mt-3 pt-3 flex items-center justify-between" style={{ borderTop: '1px solid var(--border-color)' }}>
+              <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--border-color)' }}>
                 <div className="flex items-center gap-1">
                   <div className="w-12 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-glass)' }}>
                     <div className="h-full rounded-full" style={{ width: emp.performance + '%', background: emp.performance >= 90 ? '#10B981' : '#F59E0B' }} />
                   </div>
                   <span className="text-[10px] font-bold" style={{ color: emp.performance >= 90 ? '#10B981' : '#F59E0B' }}>{emp.performance}%</span>
                 </div>
-                <button className="p-1.5 rounded-lg transition-all hover:bg-white/10" style={{ color: 'var(--text-muted)' }}><MessageCircle size={14} /></button>
               </div>
             )}
           </motion.div>
@@ -181,7 +126,7 @@ export default function TeamView() {
                 <div className="flex items-center gap-1 mt-1"><span className="w-2 h-2 rounded-full" style={{ background: statusColor(selected.status) }} /><span className="text-xs capitalize" style={{ color: 'var(--text-muted)' }}>{selected.status}</span></div>
               </div>
             </div>
-            <div className="space-y-3 mb-6">
+            <div className="space-y-3">
               {[
                 { icon: Mail, label: selected.email },
                 { icon: Phone, label: selected.phone },
@@ -193,33 +138,6 @@ export default function TeamView() {
                   <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{item.label}</span>
                 </div>
               ))}
-            </div>
-            <div className="border-t border-[var(--border-color)] pt-4">
-              <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Send Message</h3>
-              <div className="space-y-3 mb-3 max-h-40 overflow-y-auto">
-                {messages.map((msg, i) => (
-                  <div key={i} className={`flex ${msg.from === currentUser?._id ? 'justify-end' : 'justify-start'}`}>
-                    <div className="px-3 py-2 rounded-lg max-w-xs" style={{
-                      background: msg.from === currentUser?._id ? '#3B82F6' : 'var(--bg-glass)',
-                      color: msg.from === currentUser?._id ? 'white' : 'var(--text-primary)'
-                    }}>
-                      <p className="text-xs">{msg.content}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Type your message..."
-                  className="flex-1 bg-transparent outline-none px-3 py-2 rounded-lg text-sm"
-                  style={{ background: 'var(--bg-glass)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                />
-                <button onClick={handleSendMessage} className="p-2 rounded-lg text-white" style={{ background: '#3B82F6' }}><Send size={16} /></button>
-              </div>
             </div>
           </motion.div>
         </div>

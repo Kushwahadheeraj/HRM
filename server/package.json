@@ -21,6 +21,7 @@
   "author": "Traxale Team",
   "license": "MIT",
   "dependencies": {
+    "@getbrevo/brevo": "^6.0.2",
     "@slack/events-api": "^3.0.1",
     "@slack/web-api": "^7.18.0",
     "@types/express-fileupload": "^1.5.1",

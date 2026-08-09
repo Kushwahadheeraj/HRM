@@ -6,8 +6,11 @@ import {
   removeReaction,
   deleteMessage,
 } from '../controllers/chat.controller';
+import { blockHrFromChat } from '../middleware/chatAccess.middleware';
 
 const router = express.Router();
+
+router.use(blockHrFromChat);
 
 router.post('/', sendMessage);
 router.get('/channels/:channelId', getChannelMessages);

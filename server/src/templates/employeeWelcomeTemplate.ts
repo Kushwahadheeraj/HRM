@@ -505,5 +505,5 @@ export const generateEmployeeWelcomeTemplate = (data: EmployeeWelcomeData): stri
 };
 
 export const generateEmployeeWelcomeSubject = (): string => {
-  return `Welcome to ${env.COMPANY_NAME} - Your Account Details`;
+  return `Welcome to Traxale HRM - Your Employee Account`;
 };

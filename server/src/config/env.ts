@@ -27,4 +27,8 @@ export const env = {
   COMPANY_LOGO_URL: process.env.COMPANY_LOGO_URL || 'https://traxale.com/logo.png',
   EMAIL_RETRY_ATTEMPTS: Number(process.env.EMAIL_RETRY_ATTEMPTS) || 3,
   EMAIL_RETRY_DELAY_MS: Number(process.env.EMAIL_RETRY_DELAY_MS) || 2000,
+  BREVO_API_KEY: process.env.BREVO_API_KEY || '',
+  BREVO_SENDER_EMAIL: process.env.BREVO_SENDER_EMAIL || '',
+  BREVO_SENDER_NAME: process.env.BREVO_SENDER_NAME || 'Traxale HRM',
+  FRONTEND_URL: process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:5173',
 };

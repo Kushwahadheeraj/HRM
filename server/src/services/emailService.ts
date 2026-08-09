@@ -1,7 +1,8 @@
-import nodemailer from 'nodemailer';
 import { env } from '../config/env';
+import { initBrevoClient, validateBrevoConfig, brevoConfig } from '../config/brevo';
 import EmailLog from '../models/EmailLog.model';
 import mongoose from 'mongoose';
+import { BrevoClient, Brevo, type BrevoError } from '@getbrevo/brevo';
 import {
   generateEmployeeWelcomeTemplate,
   generateEmployeeWelcomeSubject,
@@ -15,6 +16,7 @@ export interface SendEmailResult {
   message: string;
   retryCount?: number;
   errorMessage?: string;
+  brevoMessageId?: string;
 }
 
 export interface EmailSendOptions {
@@ -31,76 +33,50 @@ export interface EmailSendOptions {
     content?: any;
     path?: string;
     contentType?: string;
+    url?: string;
   }>;
   employeeId?: mongoose.Types.ObjectId | string;
   organizationId?: mongoose.Types.ObjectId | string;
   emailType?: string;
 }
 
+type SendTransacEmailRequest = Brevo.SendTransacEmailRequest;
+type BrevoAttachmentItem = NonNullable<SendTransacEmailRequest['attachment']>[number];
+
 const sleep = (ms: number): Promise<void> => {
   return new Promise((resolve) => setTimeout(resolve, ms));
 };
 
-const getTransporter = (): nodemailer.Transporter | null => {
-  const smtpHost = env.SMTP_HOST || (env.EMAIL_USER ? 'smtp.gmail.com' : '');
-  const smtpPort = Number(env.SMTP_PORT || (env.SMTP_HOST ? 587 : (env.EMAIL_USER ? 587 : 0)));
-  const smtpUser = env.SMTP_USER || env.EMAIL_USER || '';
-  const smtpPass = env.SMTP_PASS || env.EMAIL_PASS || '';
+let cachedBrevoClient: BrevoClient | null = null;
+let clientInitAttempted = false;
 
-  if (!smtpHost || !smtpUser || !smtpPass) {
-    console.warn('⚠️  [EmailService] SMTP credentials incomplete.', {
-      hasHost: !!smtpHost,
-      hasUser: !!smtpUser,
-      hasPass: !!smtpPass,
-    });
-    return null;
+const getBrevoClient = (): BrevoClient | null => {
+  if (cachedBrevoClient) {
+    return cachedBrevoClient;
   }
-
-  console.log('📧 [EmailService] Initializing SMTP transporter:', {
-    host: smtpHost,
-    port: smtpPort,
-    user: smtpUser,
-  });
-
-  const isSecure = smtpPort === 465;
-  const requireTLS = smtpPort === 587;
-
-  const authObj: any = {
-    host: smtpHost,
-    port: smtpPort,
-    secure: isSecure,
-    auth: {
-      user: smtpUser,
-      pass: smtpPass,
-    },
-  };
-
-  if (requireTLS) {
-    authObj.requireTLS = true;
+  if (!clientInitAttempted) {
+    clientInitAttempted = true;
+    cachedBrevoClient = initBrevoClient();
   }
-
-  try {
-    const transporter = nodemailer.createTransport(authObj);
-    return transporter;
-  } catch (error) {
-    console.error('❌ [EmailService] Failed to create email transporter:', error);
-    return null;
-  }
+  return cachedBrevoClient;
 };
 
-export const verifySmtpConnection = async (): Promise<boolean> => {
+export const verifyBrevoConnection = async (): Promise<boolean> => {
   try {
-    const transporter = getTransporter();
-    if (!transporter) {
-      console.log('⚠️  [EmailService] SMTP credentials not configured');
+    const validation = validateBrevoConfig();
+    if (!validation.valid) {
+      console.log('⚠️  [EmailService] Brevo credentials not configured:', validation.errors);
       return false;
     }
-    await transporter.verify();
-    console.log('✅ [EmailService] SMTP connection verified successfully');
+    const client = getBrevoClient();
+    if (!client) {
+      console.log('⚠️  [EmailService] Brevo client could not be initialized');
+      return false;
+    }
+    console.log('✅ [EmailService] Brevo configuration verified');
     return true;
   } catch (error: any) {
-    console.error('❌ [EmailService] SMTP connection verification FAILED:', error?.message || error);
-    console.error('❌ [EmailService] Full error:', JSON.stringify(error, null, 2));
+    console.error('❌ [EmailService] Brevo connection verification FAILED:', error?.message || error);
     return false;
   }
 };
@@ -143,6 +119,40 @@ const logEmailDelivery = async (
   }
 };
 
+const normalizeEmailList = (emails: string | string[] | undefined): Array<{ email: string; name?: string }> => {
+  if (!emails) return [];
+  const list = Array.isArray(emails) ? emails : [emails];
+  return list
+    .filter((e) => e && typeof e === 'string' && e.trim() !== '')
+    .map((e) => ({ email: e.trim() }));
+};
+
+const buildBrevoAttachments = (
+  attachments: EmailSendOptions['attachments']
+): BrevoAttachmentItem[] | undefined => {
+  if (!attachments || attachments.length === 0) return undefined;
+
+  return attachments
+    .filter((a) => a && (a.content || a.url))
+    .map((a) => {
+      const attachment: BrevoAttachmentItem = {};
+      if (a.filename) attachment.name = a.filename;
+      if (a.content) {
+        if (typeof a.content === 'string') {
+          attachment.content = a.content;
+        } else {
+          try {
+            attachment.content = Buffer.from(a.content).toString('base64');
+          } catch {
+            attachment.content = String(a.content);
+          }
+        }
+      }
+      if (a.url) attachment.url = a.url;
+      return attachment;
+    });
+};
+
 export const sendEmailWithRetry = async (
   options: EmailSendOptions
 ): Promise<SendEmailResult> => {
@@ -175,9 +185,9 @@ export const sendEmailWithRetry = async (
     };
   }
 
-  const transporter = getTransporter();
-  if (!transporter) {
-    const errorMsg = 'Email transporter not configured. SMTP credentials are missing.';
+  const validation = validateBrevoConfig();
+  if (!validation.valid) {
+    const errorMsg = `Brevo configuration incomplete: ${validation.errors.join(', ')}`;
     console.warn('⚠️ ', errorMsg);
     await logEmailDelivery(employeeId, to, subject, 'failed', 0, errorMsg, organizationId, emailType);
     return {
@@ -188,50 +198,74 @@ export const sendEmailWithRetry = async (
     };
   }
 
-  const rawFromAddress = env.SMTP_FROM || env.EMAIL_USER || `${env.COMPANY_NAME} <${env.COMPANY_EMAIL}>`;
-  const fromAddress = rawFromAddress.replace(/^"|"$/g, '').replace(/^'|'$/g, '');
-  console.log('📧 [EmailService] Sending email:', {
+  const brevoClient = getBrevoClient();
+  if (!brevoClient) {
+    const errorMsg = 'Brevo email client not initialized. API key or configuration is missing.';
+    console.warn('⚠️ ', errorMsg);
+    await logEmailDelivery(employeeId, to, subject, 'failed', 0, errorMsg, organizationId, emailType);
+    return {
+      success: false,
+      message: errorMsg,
+      retryCount: 0,
+      errorMessage: errorMsg,
+    };
+  }
+
+  const senderName = brevoConfig.senderName || env.COMPANY_NAME;
+  const senderEmail = brevoConfig.senderEmail || env.COMPANY_EMAIL;
+
+  console.log('📧 [EmailService] Sending email via Brevo:', {
     to,
-    from: fromAddress,
+    from: `${senderName} <${senderEmail}>`,
     subject,
     replyTo: replyTo || env.COMPANY_EMAIL,
   });
 
-  const mailOptions: nodemailer.SendMailOptions = {
-    from: fromAddress,
-    to,
+  const smtpEmail: SendTransacEmailRequest = {
+    sender: {
+      name: senderName,
+      email: senderEmail,
+    },
+    to: [{ email: to }],
     subject,
-    html: htmlContent,
-    replyTo: replyTo || env.COMPANY_EMAIL,
+    htmlContent,
   };
 
   if (textContent) {
-    mailOptions.text = textContent;
+    smtpEmail.textContent = textContent;
   }
 
-  if (cc) {
-    mailOptions.cc = cc;
+  if (replyTo && isValidEmail(replyTo)) {
+    smtpEmail.replyTo = {
+      email: replyTo,
+      name: replyTo,
+    };
   }
 
-  if (bcc) {
-    mailOptions.bcc = bcc;
-  }
+  const ccList = normalizeEmailList(cc);
+  if (ccList.length > 0) smtpEmail.cc = ccList;
 
-  if (attachments && attachments.length > 0) {
-    mailOptions.attachments = attachments;
+  const bccList = normalizeEmailList(bcc);
+  if (bccList.length > 0) smtpEmail.bcc = bccList;
+
+  const brevoAttachments = buildBrevoAttachments(attachments);
+  if (brevoAttachments && brevoAttachments.length > 0) {
+    smtpEmail.attachment = brevoAttachments;
   }
 
   let lastError: any = null;
+  let brevoMessageId: string | undefined;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      console.log(`📤 [EmailService] Attempt ${attempt}/${maxAttempts} - sending email to ${to}...`);
-      const info = await transporter.sendMail(mailOptions);
-      console.log(`✅ [EmailService] Email sent (attempt ${attempt}/${maxAttempts}):`, {
+      console.log(`📤 [EmailService] Attempt ${attempt}/${maxAttempts} - sending Brevo email to ${to}...`);
+
+      const response: any = await brevoClient.transactionalEmails.sendTransacEmail(smtpEmail);
+      brevoMessageId = response?.messageId || (response as any)?.body?.messageId || undefined;
+
+      console.log(`✅ [EmailService] Brevo email sent (attempt ${attempt}/${maxAttempts}):`, {
         to,
-        messageId: info.messageId,
-        accepted: info.accepted,
-        rejected: info.rejected,
+        brevoMessageId,
       });
 
       await logEmailDelivery(
@@ -249,15 +283,33 @@ export const sendEmailWithRetry = async (
         success: true,
         message: `Email sent successfully to ${to}`,
         retryCount: attempt - 1,
+        brevoMessageId,
       };
     } catch (error: any) {
       lastError = error;
-      console.error(`❌ [EmailService] Failed attempt ${attempt}/${maxAttempts} to ${to}:`, {
-        message: error?.message,
-        code: error?.code,
-        command: error?.command,
-        response: error?.response ? String(error.response).slice(0, 500) : undefined,
+      const isBrevoError = (error as any)?.name?.includes('Brevo') || 'statusCode' in (error as any);
+      const brevoBody = (error as BrevoError)?.body as any;
+      const errorBody = brevoBody || (error as any)?.response?.body || (error as any)?.body;
+      const brevoCode = errorBody?.code || (error as any)?.code;
+      const brevoMessage = errorBody?.message || (error as any)?.message;
+      const httpStatus = (error as BrevoError)?.statusCode || (error as any)?.status || (error as any)?.response?.statusCode;
+
+      console.error(`❌ [EmailService] Failed Brevo attempt ${attempt}/${maxAttempts} to ${to}:`, {
+        message: brevoMessage,
+        code: brevoCode,
+        httpStatus,
+        isBrevoError,
       });
+
+      const nonRetryableCodes = ['invalid_parameter', 'unauthorized', 'authentication_failed'];
+      const nonRetryableStatuses = [400, 401, 403, 404, 422];
+      if (
+        nonRetryableCodes.includes(brevoCode) ||
+        nonRetryableStatuses.includes(httpStatus)
+      ) {
+        console.error(`❌ [EmailService] Non-retryable Brevo error (${brevoCode || httpStatus}), aborting retries.`);
+        break;
+      }
 
       if (attempt < maxAttempts) {
         console.log(`⏳ [EmailService] Retrying in ${retryDelay}ms...`);
@@ -266,14 +318,13 @@ export const sendEmailWithRetry = async (
     }
   }
 
-  const errorMsg = lastError?.message || `Failed to send email after ${maxAttempts} attempts`;
-  const errorDetails = lastError?.code
-    ? ` [Code: ${lastError.code}]`
+  const brevoBody = (lastError as BrevoError)?.body as any;
+  const errorMsg = brevoBody?.message || lastError?.response?.body?.message || lastError?.message || `Failed to send email after ${maxAttempts} attempts`;
+  const errorCode = brevoBody?.code || lastError?.code || lastError?.response?.body?.code;
+  const errorDetails = errorCode
+    ? ` [Code: ${errorCode}]`
     : '';
   console.error(`❌ [EmailService] PERMANENT FAIL after ${maxAttempts} attempts to ${to}: ${errorMsg}${errorDetails}`);
-  if (lastError?.response) {
-    console.error(`❌ [EmailService] Server response:`, String(lastError.response).slice(0, 800));
-  }
 
   await logEmailDelivery(
     employeeId,
@@ -309,7 +360,7 @@ export const sendEmployeeWelcomeEmail = async (
     const textContent = `
 Welcome to ${env.COMPANY_NAME}, ${employeeData.employeeName}!
 
-Your account has been created successfully.
+Your employee account has been created successfully.
 
 EMPLOYEE INFORMATION:
 - Employee Name: ${employeeData.employeeName}
