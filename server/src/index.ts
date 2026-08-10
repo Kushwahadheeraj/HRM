@@ -51,7 +51,7 @@ connectDB()
       console.log('✅ Pricing initialized successfully!');
       
       // Check if super admin exists
-      let superAdmin = await User.findOne({ email: 'dheeraj01072001@gmail.com' });
+      let superAdmin = await User.findOne({ role: 'super_admin' });
       if (!superAdmin) {
         // Create super admin
         superAdmin = await User.create({

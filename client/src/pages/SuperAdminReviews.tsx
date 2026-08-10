@@ -10,7 +10,7 @@ export default function SuperAdminReviews() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!currentUser || currentUser.email !== 'dheeraj01072001@gmail.com') {
+    if (!currentUser || currentUser.role !== 'super_admin') {
       setCurrentPage('dashboard');
       return;
     }

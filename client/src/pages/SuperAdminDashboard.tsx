@@ -27,7 +27,7 @@ export default function SuperAdminDashboard() {
 
   // Check if current user is super admin
   useEffect(() => {
-    if (!currentUser || currentUser.email !== 'dheeraj01072001@gmail.com') {
+    if (!currentUser || currentUser.role !== 'super_admin') {
       setCurrentPage('dashboard');
     }
   }, [currentUser, setCurrentPage]);
@@ -55,7 +55,7 @@ export default function SuperAdminDashboard() {
       }
     };
 
-    if (currentUser && currentUser.email === 'dheeraj01072001@gmail.com') {
+    if (currentUser && currentUser.role === 'super_admin') {
       fetchStats();
     }
   }, [currentUser]);

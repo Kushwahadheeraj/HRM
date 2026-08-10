@@ -107,7 +107,7 @@ const defaultResponse = [
 
 export default function AIAssistant() {
   const { currentUser, setCurrentPage } = useApp();
-  const isSuperAdmin = currentUser?.email === 'dheeraj01072001@gmail.com';
+  const isSuperAdmin = currentUser?.role === 'super_admin';
   
   // Redirect super admin to their dashboard
   useEffect(() => {

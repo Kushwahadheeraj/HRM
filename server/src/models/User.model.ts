@@ -38,6 +38,7 @@ export interface IUser extends Document {
   storageUsed?: number;
   storageTotal?: number;
   lastLogin?: Date;
+  address?: string;
 }
 
 const UserSchema: Schema = new Schema({
@@ -74,7 +75,8 @@ const UserSchema: Schema = new Schema({
   plan: { type: String, default: 'Professional' },
   storageUsed: { type: Number, default: 2.4 },
   storageTotal: { type: Number, default: 10 },
-  lastLogin: { type: Date, default: Date.now }
+  lastLogin: { type: Date, default: Date.now },
+  address: { type: String, default: '' }
 }, { timestamps: true });
 
 UserSchema.virtual('id').get(function(this: IUser) {

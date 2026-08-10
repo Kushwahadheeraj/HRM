@@ -65,7 +65,7 @@ export const getAllReviews = async (req: Request, res: Response<ApiResponse>) =>
     }
 
     const user = await User.findById(userId);
-    if (!user || user.email !== 'dheeraj01072001@gmail.com') {
+    if (!user || user.role !== 'super_admin') {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
@@ -86,7 +86,7 @@ export const updateReviewStatus = async (req: Request, res: Response<ApiResponse
     }
 
     const user = await User.findById(userId);
-    if (!user || user.email !== 'dheeraj01072001@gmail.com') {
+    if (!user || user.role !== 'super_admin') {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
@@ -123,7 +123,7 @@ export const deleteReview = async (req: Request, res: Response<ApiResponse>) => 
     }
 
     const user = await User.findById(userId);
-    if (!user || user.email !== 'dheeraj01072001@gmail.com') {
+    if (!user || user.role !== 'super_admin') {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 

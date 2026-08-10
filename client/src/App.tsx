@@ -104,12 +104,12 @@ function AppProvider({ children }: { children: ReactNode }) {
   const login = (userData: User) => {
     setCurrentUser(userData);
     setIsLoggedIn(true);
-    // Check if super admin email
-    if (userData.email === 'dheeraj01072001@gmail.com') {
+    // For any super_admin role: go to super-admin-dashboard
+    if (userData.role === 'super_admin') {
       setCurrentPage('super-admin-dashboard');
     }
-    // For HR Manager or Super Admin: always go to dashboard
-    else if (userData.role === 'hr_manager' || userData.role === 'super_admin') {
+    // For HR Manager: always go to dashboard
+    else if (userData.role === 'hr_manager') {
       setCurrentPage('dashboard');
     } 
     // For team managers (non HR): go to team manager dashboard

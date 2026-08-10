@@ -235,8 +235,8 @@ export const register = async (req: Request, res: Response<ApiResponse>) => {
 
 export const getSuperAdmin = async (req: Request, res: Response<ApiResponse>) => {
   try {
-    // Find super admin by role or by specific email
-    let superAdmin = await User.findOne({ role: 'super_admin' }) || await User.findOne({ email: 'dheeraj01072001@gmail.com' });
+    // Find super admin by role
+    let superAdmin = await User.findOne({ role: 'super_admin' });
     
     // If no super admin exists, create one
     if (!superAdmin) {
@@ -585,7 +585,7 @@ export const getOrganizationStats = async (req: Request, res: Response<ApiRespon
     }
 
     const user = await User.findById(userId);
-    if (!user || user.email !== 'dheeraj01072001@gmail.com') {
+    if (!user || user.role !== 'super_admin') {
       return res.status(403).json({
         success: false,
         message: 'Access denied',
@@ -675,7 +675,7 @@ export const updatePricing = async (req: Request, res: Response<ApiResponse>) =>
       });
     }
     const user = await User.findById(userId);
-    if (!user || user.email !== 'dheeraj01072001@gmail.com') {
+    if (!user || user.role !== 'super_admin') {
       return res.status(403).json({
         success: false,
         message: 'Access denied. Only super admin can update pricing.',

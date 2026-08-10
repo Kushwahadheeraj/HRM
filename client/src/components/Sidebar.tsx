@@ -79,7 +79,7 @@ export default function Sidebar() {
   // Check if user is any manager role by roleLabel (but not HR Manager!)
   const isManagerUser = currentUser && managerRoleLabels.includes(currentUser.roleLabel);
   const role = currentUser?.role || 'employee';
-  const isSuperAdmin = currentUser?.email === 'dheeraj01072001@gmail.com';
+  const isSuperAdmin = currentUser?.role === 'super_admin';
   
   // If user has hr_manager or super_admin, always use hrManagerMenu
   let menuItems;

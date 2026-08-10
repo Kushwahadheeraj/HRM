@@ -1,4 +1,4 @@
-export type UserRole = 'hr_manager' | 'team_manager' | 'employee';
+export type UserRole = 'hr_manager' | 'team_manager' | 'employee' | 'super_admin';
 
 export interface User {
   id: string;
@@ -12,6 +12,7 @@ export interface User {
   employeeId: string;
   phone?: string;
   shiftId?: string;
+  address?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
