@@ -111,7 +111,7 @@ export default function Landing() {
             </div>
             <div className="hidden md:flex items-center gap-3">
               <button onClick={toggleTheme} className="p-2 rounded-lg" style={{ color: 'var(--text-muted)' }}>{theme === 'dark' ? '☀️' : '🌙'}</button>
-              <a href="/traxale-app.apk" download className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl transition-all hover:scale-105" style={{ background: 'var(--bg-glass)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}>
+              <a href="/Releases/traxale-app.apk" download className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl transition-all hover:scale-105" style={{ background: 'var(--bg-glass)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}>
                 <Download size={16} />
                 Download App
               </a>
