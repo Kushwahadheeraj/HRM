@@ -48,13 +48,9 @@ export default function Landing() {
 
 
   const handleDownloadApp = () => {
-    const API_BASE_URL =
-      import.meta.env.VITE_API_BASE_URL ||
-      'http://localhost:5000';
-
-    window.location.href =
-      `${API_BASE_URL}/api/download/app`;
-  };
+  window.location.href =
+    'http://200.234.32.215:5000/api/download/app';
+};
   useEffect(() => {
     const fetchData = async () => {
       try {
