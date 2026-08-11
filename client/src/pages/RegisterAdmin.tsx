@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../App';
-import { ArrowLeft, Lock, Eye, EyeOff, Building2, CreditCard, CheckCircle2, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Lock, Eye, EyeOff, Building2, CreditCard, CheckCircle2, ArrowRight, MapPin } from 'lucide-react';
 import { authAPI } from '../lib/api';
 import { useCurrency } from '../lib/currency';
 import { PricingPlan } from '../lib/types';
@@ -20,6 +20,7 @@ export default function RegisterAdmin({ mode }: { mode: 'free-trial' | 'paid' })
     confirmPassword: '',
     organizationName: '',
     phone: '',
+    address: '',
   });
   const [plans, setPlans] = useState<PricingPlan[]>([]);
   const [pricingLoading, setPricingLoading] = useState(true);
@@ -258,7 +259,20 @@ export default function RegisterAdmin({ mode }: { mode: 'free-trial' | 'paid' })
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })} 
                     className="w-full px-4 py-3.5 rounded-xl text-sm outline-none transition-all focus:ring-2 focus:ring-blue-500/30" 
                     style={{ background: 'var(--bg-glass)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} 
-                    placeholder="+91 98765 43210"
+                    placeholder="+91 00000 00000"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                    <span className="inline-flex items-center gap-1.5"><MapPin size={12} /> Office Address</span>
+                  </label>
+                  <textarea
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    rows={3}
+                    className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all focus:ring-2 focus:ring-blue-500/30 resize-none"
+                    style={{ background: 'var(--bg-glass)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+                    placeholder="4th Floor, Office No. 401 Shree Ram Commercial Park Shardhapuri Phase 2, Kankar Khera. Meerut UP 250002"
                   />
                 </div>
                 <div>

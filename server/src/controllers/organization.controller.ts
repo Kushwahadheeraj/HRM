@@ -4,13 +4,21 @@ import { ApiResponse } from '../types';
 
 export const getOrganizationSettings = async (req: Request, res: Response<ApiResponse>) => {
   try {
+    console.log('🔍 [getOrganizationSettings] req.organizationId:', req.organizationId);
+    console.log('🔍 [getOrganizationSettings] x-user-id header:', req.headers['x-user-id']);
     const organization = await Organization.findById(req.organizationId);
     if (!organization) {
+      console.log('❌ [getOrganizationSettings] Organization not found for orgId:', req.organizationId);
       return res.status(404).json({
         success: false,
         message: 'Organization not found',
       });
     }
+    console.log('✅ [getOrganizationSettings] Found org:', {
+      name: organization.name,
+      address: organization.officeLocation?.address,
+      adminId: organization.adminId,
+    });
     res.json({
       success: true,
       data: organization,

@@ -3,6 +3,8 @@ import { initBrevoClient, validateBrevoConfig, brevoConfig } from '../config/bre
 import EmailLog from '../models/EmailLog.model';
 import mongoose from 'mongoose';
 import { BrevoClient, Brevo, type BrevoError } from '@getbrevo/brevo';
+import fs from 'fs';
+import path from 'path';
 import {
   generateEmployeeWelcomeTemplate,
   generateEmployeeWelcomeSubject,
@@ -10,6 +12,77 @@ import {
   generateBaseEmailLayout,
 } from '../templates/employeeWelcomeTemplate';
 import { isValidEmail } from '../utils/password';
+
+export const LOGO_CID = 'company-logo-cid@traxale-hrm';
+
+let cachedLogoBase64: string | null = null;
+let cachedLogoAttempted = false;
+
+const getLogoBase64 = async (): Promise<string | null> => {
+  if (cachedLogoAttempted) return cachedLogoBase64;
+  cachedLogoAttempted = true;
+  try {
+    const candidates = [
+      path.join(__dirname, '..', 'assets', 'logo.png'),
+      path.join(process.cwd(), 'dist', 'assets', 'logo.png'),
+      path.join(process.cwd(), 'src', 'assets', 'logo.png'),
+      path.join(process.cwd(), 'public', 'logo.png'),
+      path.join(process.cwd(), '..', 'client', 'public', 'logo.png'),
+    ];
+    for (const p of candidates) {
+      if (fs.existsSync(p)) {
+        cachedLogoBase64 = fs.readFileSync(p).toString('base64');
+        console.log(`✅ [EmailService] Loaded logo for inline email attachment from: ${p}`);
+        return cachedLogoBase64;
+      }
+    }
+
+    try {
+      const url = env.COMPANY_LOGO_URL;
+      if (url && /^https?:\/\//i.test(url)) {
+        console.log(`⏳ [EmailService] Local logo not found; trying to fetch from: ${url}`);
+        const isHttps = url.toLowerCase().startsWith('https://');
+        const httpModule = isHttps ? await import('https') : await import('http');
+        const b64 = await new Promise<string | null>((resolve) => {
+          const req = httpModule.get(url, (res: any) => {
+            if (!res || res.statusCode !== 200) {
+              try { res.resume(); } catch {}
+              resolve(null);
+              return;
+            }
+            const chunks: Buffer[] = [];
+            res.on('data', (c: Buffer) => chunks.push(c));
+            res.on('end', () => {
+              try {
+                const buf = Buffer.concat(chunks);
+                if (buf.length > 100) resolve(buf.toString('base64'));
+                else resolve(null);
+              } catch {
+                resolve(null);
+              }
+            });
+            res.on('error', () => resolve(null));
+          });
+          req.on('error', () => resolve(null));
+          req.setTimeout(8000, () => { try { req.destroy(); } catch {}; resolve(null); });
+        });
+        if (b64) {
+          cachedLogoBase64 = b64;
+          console.log(`✅ [EmailService] Fetched logo from URL: ${url}`);
+          return cachedLogoBase64;
+        }
+      }
+    } catch (fetchErr: any) {
+      console.warn('⚠️  [EmailService] Failed to fetch logo from URL:', fetchErr?.message || fetchErr);
+    }
+
+    console.log('⚠️  [EmailService] Logo not found locally or via URL; template will use COMPANY_LOGO_URL as img src fallback');
+    return null;
+  } catch (err: any) {
+    console.error('❌ [EmailService] Failed to read logo file:', err?.message || err);
+    return null;
+  }
+};
 
 export interface SendEmailResult {
   success: boolean;
@@ -251,6 +324,21 @@ export const sendEmailWithRetry = async (
   const brevoAttachments = buildBrevoAttachments(attachments);
   if (brevoAttachments && brevoAttachments.length > 0) {
     smtpEmail.attachment = brevoAttachments;
+  }
+
+  const logoB64 = await getLogoBase64();
+  if (logoB64 && smtpEmail.htmlContent) {
+    const inlineLogo: BrevoAttachmentItem = {
+      name: 'logo.png',
+      content: logoB64,
+    };
+    (inlineLogo as any).cid = LOGO_CID;
+    smtpEmail.attachment = smtpEmail.attachment
+      ? [inlineLogo, ...smtpEmail.attachment]
+      : [inlineLogo];
+    smtpEmail.htmlContent = smtpEmail.htmlContent
+      .split(`src="${env.COMPANY_LOGO_URL}"`)
+      .join(`src="cid:${LOGO_CID}"`);
   }
 
   let lastError: any = null;

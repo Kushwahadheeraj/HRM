@@ -153,7 +153,7 @@ export const authAPI = {
       method: 'POST',
       body: JSON.stringify(userData),
     }),
-  registerAdmin: async (adminData: { name: string; email: string; password: string; organizationName: string }): Promise<ApiResponse<{ user: User }>> =>
+  registerAdmin: async (adminData: { name: string; email: string; password: string; organizationName: string; phone?: string; address?: string }): Promise<ApiResponse<{ user: User; organization: any }>> =>
     apiRequest('/auth/register-admin', {
       method: 'POST',
       body: JSON.stringify(adminData),

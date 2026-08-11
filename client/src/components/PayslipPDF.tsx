@@ -109,10 +109,12 @@ interface PayslipData {
   leaveDays: number;
   currencySymbol?: string;
   isIndian?: boolean;
+  companyName?: string;
+  companyAddress?: string;
 }
 
 const PayslipPDF: React.FC<{ data: PayslipData }> = ({ data }) => {
-  const { currencySymbol = '$', isIndian = false } = data;
+  const { currencySymbol = '$', isIndian = false, companyName = 'Traxale HRM', companyAddress = '4th Floor, Office No. 401 Shree Ram Commercial Park Shardhapuri Phase 2, Kankar Khera. Meerut UP 250002' } = data;
   const formatCurrency = (amount: number) => {
     return `${currencySymbol}${Math.floor(amount).toLocaleString(isIndian ? 'en-IN' : 'en-US')}`;
   };
@@ -121,8 +123,8 @@ const PayslipPDF: React.FC<{ data: PayslipData }> = ({ data }) => {
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
-          <Text style={styles.companyName}>Traxale Ltd</Text>
-          <Text style={styles.companyAddress}>123 Main St, Anytown, USA</Text>
+          <Text style={styles.companyName}>{companyName}</Text>
+          <Text style={styles.companyAddress}>{companyAddress}</Text>
           <Text style={styles.title}>Payslip for the month of {data.month} {data.year}</Text>
         </View>
 
@@ -223,7 +225,7 @@ const PayslipPDF: React.FC<{ data: PayslipData }> = ({ data }) => {
 
         <View style={styles.signature}>
           <Text style={{ borderTopWidth: 1, borderTopColor: '#000', paddingTop: 5 }}>Signature</Text>
-          <Text style={{ marginTop: 10 }}>Relyon Softech Ltd</Text>
+          <Text style={{ marginTop: 10 }}>{companyName}</Text>
         </View>
       </Page>
     </Document>

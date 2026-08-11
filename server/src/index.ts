@@ -37,6 +37,8 @@ import messageRoutes from './routes/message.routes';
 import performanceRoutes from './routes/performance.routes';
 import reviewRoutes from './routes/review.routes';
 import organizationRoutes from './routes/organization.routes';
+import downloadRoutes from './routes/download.routes';
+import appSettingsRoutes from './routes/appSettings.routes';
 // import { initializeSocket } from './socket/socket.server';
 
 // Load environment variables
@@ -304,6 +306,9 @@ app.use(checkTrialStatus);
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
+// Serve public assets (logo, etc.)
+app.use('/', express.static(path.join(process.cwd(), 'public')));
+
 // Health Check
 app.get('/api/health', (req, res) => {
   res.json({
@@ -336,6 +341,7 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/performance', performanceRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/organization', organizationRoutes);
+app.use('/api/download', downloadRoutes);
 
 // Error Handling Middleware
 app.use(notFound);

@@ -44,8 +44,17 @@ export default function Landing() {
   const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [downloadingApp, setDownloadingApp] = useState(false);
 
-  // Fetch pricing and reviews from API
+
+  const handleDownloadApp = () => {
+    const API_BASE_URL =
+      import.meta.env.VITE_API_BASE_URL ||
+      'http://localhost:5000';
+
+    window.location.href =
+      `${API_BASE_URL}/api/download/app`;
+  };
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -53,16 +62,16 @@ export default function Landing() {
           authAPI.getPricing(),
           reviewsAPI.getApproved()
         ]);
-        
+
         if (pricingRes.success && pricingRes.data) {
           // Sort in fixed order: Basic → Pro → Enterprise
           const planOrder = ['Basic', 'Pro', 'Enterprise'];
-          const sortedPricing = [...pricingRes.data].sort((a, b) => 
+          const sortedPricing = [...pricingRes.data].sort((a, b) =>
             planOrder.indexOf(a.plan) - planOrder.indexOf(b.plan)
           );
           setPricing(sortedPricing);
         }
-        
+
         if (reviewsRes.success && reviewsRes.data) {
           setReviews(reviewsRes.data);
         }
@@ -111,33 +120,43 @@ export default function Landing() {
             </div>
             <div className="hidden md:flex items-center gap-3">
               <button onClick={toggleTheme} className="p-2 rounded-lg" style={{ color: 'var(--text-muted)' }}>{theme === 'dark' ? '☀️' : '🌙'}</button>
-              <a href="/Releases/traxale-app.apk" download className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl transition-all hover:scale-105" style={{ background: 'var(--bg-glass)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}>
+
+              <button
+                onClick={handleDownloadApp}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl"
+                style={{
+                  background: 'var(--bg-glass)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                }}
+              >
                 <Download size={16} />
                 Download App
-              </a>
+              </button>
               <button onClick={() => setCurrentPage('login')} className="px-4 py-2 text-sm font-medium rounded-xl transition-all hover:scale-105" style={{ color: 'var(--text-primary)' }}>Sign In</button>
               <button onClick={handleFreeTrial} className="px-5 py-2.5 text-sm font-semibold rounded-xl text-white transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/25" style={{ background: 'linear-gradient(135deg, #3B82F6, #2563EB)' }}>Start Free Trial</button>
             </div>
             <div className="flex items-center gap-2 md:hidden">
-                  <button
-                    type="button"
-                    onClick={toggleTheme}
-                    className="flex items-center justify-center rounded-xl p-2.5"
-                    style={{ background: 'var(--bg-glass)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
-                    aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-                  >
-                    {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-                  </button>
-              <a
-                href="/traxale-app.apk"
-                download
+              <button
+                type="button"
+                onClick={toggleTheme}
                 className="flex items-center justify-center rounded-xl p-2.5"
+                style={{ background: 'var(--bg-glass)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+                aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              >
+                {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadApp}
+                disabled={downloadingApp}
+                className="flex items-center justify-center rounded-xl p-2.5 disabled:opacity-60 disabled:cursor-not-allowed"
                 style={{ background: 'var(--bg-glass)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
                 aria-label="Download App"
               >
                 <Download size={18} className='mr-2' />
-                Download App
-              </a>
+                {downloadingApp ? '...' : 'Download App'}
+              </button>
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen((prev) => !prev)}
@@ -289,7 +308,7 @@ export default function Landing() {
                 const isPopular = plan.plan === 'Pro';
                 const price = isIndian ? plan.priceInr : plan.priceUsd;
                 const priceDisplay = plan.plan === 'Enterprise' ? 'Custom' : `${currencySymbol}${price}`;
-                
+
                 return (
                   <motion.div key={plan.plan} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.15 }} className={'glass-card p-8 rounded-2xl transition-all hover:scale-[1.02] relative ' + (isPopular ? 'neon-glow' : '')} style={isPopular ? { border: '1px solid rgba(59, 130, 246, 0.3)' } : {}}>
                     {isPopular && <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-bold text-white" style={{ background: 'linear-gradient(135deg, #3B82F6, #F97316)' }}>Most Popular</div>}
@@ -341,7 +360,7 @@ export default function Landing() {
             <h2 className="text-3xl md:text-4xl font-black mb-4" style={{ color: 'var(--text-primary)' }}>Ready to Transform Your HR?</h2>
             <p className="text-lg mb-8" style={{ color: 'var(--text-secondary)' }}>Join 10,000+ companies already using Traxale HRM</p>
             <button onClick={() => handleGetStarted('Pro')} className="group inline-flex items-center gap-2 px-8 py-4 rounded-2xl text-white font-semibold transition-all hover:scale-105 hover:shadow-xl hover:shadow-blue-500/25" style={{ background: 'linear-gradient(135deg, #3B82F6, #2563EB)' }}>
-                Get Started <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+              Get Started <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
             </button>
           </div>
         </div>

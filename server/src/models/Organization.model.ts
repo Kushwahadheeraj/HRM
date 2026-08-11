@@ -2,7 +2,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IOrganization extends Document {
   name: string;
-  adminId: mongoose.Types.ObjectId;
+  adminId?: mongoose.Types.ObjectId;
   trialStartDate: Date;
   trialEndDate: Date;
   isPaid: boolean;
@@ -31,7 +31,7 @@ export interface IOrganization extends Document {
 
 const OrganizationSchema: Schema = new Schema({
   name: { type: String, required: true },
-  adminId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  adminId: { type: Schema.Types.ObjectId, ref: 'User' },
   trialStartDate: { type: Date, required: true, default: Date.now },
   trialEndDate: { type: Date, required: true },
   isPaid: { type: Boolean, required: true, default: false },

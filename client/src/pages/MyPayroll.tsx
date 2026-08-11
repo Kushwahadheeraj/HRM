@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { IndianRupee, Download, TrendingUp, Calendar, FileText, CreditCard, PieChart, Loader2 } from 'lucide-react';
 import { PieChart as RechartsPie, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { PDFDownloadLink } from '@react-pdf/renderer';
-import { payrollAPI } from '../lib/api';
+import { payrollAPI, organizationAPI } from '../lib/api';
 import PayslipPDF from '../components/PayslipPDF';
 import { useCurrency } from '../lib/currency';
 
@@ -53,6 +53,7 @@ export default function MyPayroll() {
   const [salaryHistory, setSalaryHistory] = useState<SalaryHistoryItem[]>([]);
   const [payslips, setPayslips] = useState<Payslip[]>([]);
   const [loading, setLoading] = useState(true);
+  const [organization, setOrganization] = useState<{ name: string; officeLocation?: { address?: string } } | null>(null);
   const downloadLinksRef = React.useRef<{ [key: string]: HTMLAnchorElement | null }>({});
 
   useEffect(() => {
@@ -60,13 +61,50 @@ export default function MyPayroll() {
       if (!currentUser?.employeeId) return;
       setLoading(true);
       try {
-        const res = await payrollAPI.getByEmployee(currentUser.employeeId);
-        if (res.success && res.data) {
-          const transformedHistory = res.data.map((item: any) => ({
+        let orgData: { name: string; officeLocation?: { address?: string } } | null = null;
+
+        try {
+          const orgRes = await organizationAPI.getSettings();
+          console.log('📥 [MyPayroll] organizationAPI.getSettings() response:', orgRes);
+          if (orgRes.success && orgRes.data) {
+            orgData = orgRes.data;
+            console.log('✅ [MyPayroll] Using organization from API:', {
+              name: orgData.name,
+              address: orgData.officeLocation?.address,
+            });
+          }
+        } catch (orgErr) {
+          console.warn('⚠️ [MyPayroll] organizationAPI.getSettings() failed, fallback to localStorage:', orgErr);
+        }
+
+        // Fallback 1: check if login/auth response mein organization data attached hai
+        if (!orgData && currentUser && (currentUser as any).organization) {
+          orgData = (currentUser as any).organization;
+          console.log('✅ [MyPayroll] Using organization from currentUser:', orgData);
+        }
+
+        // Fallback 2: check localStorage ke saved user mein kya organization data hai
+        if (!orgData) {
+          try {
+            const saved = localStorage.getItem('currentUser');
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              console.log('🔍 [MyPayroll] localStorage currentUser keys:', Object.keys(parsed));
+              console.log('🔍 [MyPayroll] localStorage organizationId:', parsed.organizationId);
+              console.log('🔍 [MyPayroll] localStorage organization:', (parsed as any).organization);
+            }
+          } catch (e) { /* ignore */ }
+        }
+
+        if (orgData) setOrganization(orgData);
+
+        const payrollRes = await payrollAPI.getByEmployee(currentUser.employeeId);
+        if (payrollRes.success && payrollRes.data) {
+          const transformedHistory = payrollRes.data.map((item: any) => ({
             month: item.month.split(' ')[0].substring(0, 3),
             amount: item.netSalary || 0
           }));
-          const transformedPayslips = res.data.map((item: any) => ({
+          const transformedPayslips = payrollRes.data.map((item: any) => ({
             id: item.id,
             month: item.month,
             gross: item.totalEarnings || 0,
@@ -307,6 +345,8 @@ export default function MyPayroll() {
                       leaveDays: slip.leaveDays || 0,
                       currencySymbol,
                       isIndian,
+                      companyName: organization?.name,
+                      companyAddress: organization?.officeLocation?.address,
                     }} />} 
                     fileName={`Payslip_${slip.month}.pdf`}
                     className="p-2 rounded-lg hover:bg-white/10"

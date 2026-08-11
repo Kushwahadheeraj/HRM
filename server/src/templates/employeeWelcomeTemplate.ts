@@ -192,8 +192,8 @@ export const generateBaseEmailLayout = (
                     <td style="text-align:center;">
                       <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center">
                         <tr>
-                          <td style="width:56px;height:56px;background-color:rgba(255,255,255,0.15);border-radius:14px;text-align:center;vertical-align:middle;">
-                            <span style="color:#ffffff;font-size:28px;font-weight:800;letter-spacing:-1px;">T</span>
+                          <td style="width:56px;height:56px;background-color:rgba(255,255,255,0.15);border-radius:14px;text-align:center;vertical-align:middle;overflow:hidden;">
+                            <img src="${env.COMPANY_LOGO_URL}" alt="${env.COMPANY_NAME}" width="56" height="56" style="display:block;width:56px;height:56px;object-fit:contain;border:0;outline:none;text-decoration:none;" />
                           </td>
                           <td style="padding-left:14px;">
                             <div style="color:#ffffff;font-size:24px;font-weight:700;line-height:1.2;letter-spacing:-0.3px;">${env.COMPANY_NAME}</div>
@@ -505,5 +505,5 @@ export const generateEmployeeWelcomeTemplate = (data: EmployeeWelcomeData): stri
 };
 
 export const generateEmployeeWelcomeSubject = (): string => {
-  return `Welcome to Traxale HRM - Your Employee Account`;
+  return `Welcome to ${env.COMPANY_NAME} - Your Employee Account`;
 };

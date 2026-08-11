@@ -6,6 +6,7 @@ import { ApiResponse } from '../types';
 import bcrypt from 'bcrypt';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
+import mongoose from 'mongoose';
 import { env } from '../config/env';
 
 // Debug route to list all users
@@ -66,9 +67,27 @@ export const login = async (req: Request, res: Response<ApiResponse>) => {
     await user.save();
 
     const userJson = user.toJSON();
+    delete (userJson as any).password;
+
+    // Attach organization data to login response so client can use name/address immediately
+    let organization = null;
+    if (user.organizationId) {
+      try {
+        organization = await Organization.findById(user.organizationId);
+        if (organization) {
+          organization = organization.toJSON();
+        }
+      } catch (orgErr) {
+        console.warn('[login] Could not fetch organization data:', orgErr);
+      }
+    }
+
     const responseData: any = userJson;
     responseData.mustChangePassword = user.mustChangePassword || false;
     responseData.temporaryPasswordSet = user.temporaryPasswordSet || false;
+    if (organization) {
+      responseData.organization = organization;
+    }
 
     let loginMessage = 'Login successful';
     if (user.mustChangePassword) {
@@ -93,7 +112,7 @@ export const registerAdmin = async (req: Request, res: Response<ApiResponse>) =>
   // console.log('=== [registerAdmin] Request received ===');
   // console.log('Request body:', req.body);
   try {
-    const { name, email, password, organizationName, phone } = req.body;
+    const { name, email, password, organizationName, phone, address } = req.body;
 
     // Check required fields
     if (!name || !email || !password || !organizationName) {
@@ -119,8 +138,22 @@ export const registerAdmin = async (req: Request, res: Response<ApiResponse>) =>
     // console.log('🔑 [registerAdmin] Hashing password');
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create admin user
-    // console.log('👤 [registerAdmin] Creating user in MongoDB');
+    // Create organization first (needed for _id reference)
+    // console.log('🏢 [registerAdmin] Creating organization in MongoDB');
+    const trialStartDate = new Date();
+    const trialEndDate = new Date(trialStartDate);
+    trialEndDate.setDate(trialEndDate.getDate() + 30);
+    const newOrganization = await Organization.create({
+      name: organizationName,
+      trialStartDate,
+      trialEndDate,
+      isPaid: false,
+      ...(address ? { officeLocation: { address } } : {}),
+    });
+    // console.log('✅ [registerAdmin] Organization created:', newOrganization._id);
+
+    // Create admin user with organizationId directly (single save, no second update)
+    // console.log('� [registerAdmin] Creating user in MongoDB');
     const newUser = await User.create({
       name,
       email,
@@ -131,44 +164,24 @@ export const registerAdmin = async (req: Request, res: Response<ApiResponse>) =>
       avatar: '',
       employeeId: `TRX-ADMIN-${Date.now().toString().slice(-6)}`,
       phone: phone || '',
+      address: address || '',
+      organizationId: newOrganization._id,
     });
-    // console.log('✅ [registerAdmin] User created:', newUser._id);
-    // console.log('newUser object after create:', newUser);
+    // Link organization back to admin
+    newOrganization.adminId = newUser._id;
+    await newOrganization.save();
+    // console.log('✅ [registerAdmin] User created:', newUser._id, 'orgId:', newUser.organizationId);
 
-    // Create organization
-    // console.log('🏢 [registerAdmin] Creating organization in MongoDB');
-    const trialStartDate = new Date();
-    const trialEndDate = new Date(trialStartDate);
-    trialEndDate.setDate(trialEndDate.getDate() + 30);
-    const newOrganization = await Organization.create({
-      name: organizationName,
-      adminId: newUser._id,
-      trialStartDate,
-      trialEndDate,
-      isPaid: false
-    });
-    // console.log('✅ [registerAdmin] Organization created:', newOrganization);
-    // console.log('newOrganization._id:', newOrganization._id);
+    const userJson = newUser.toJSON();
+    delete (userJson as any).password;
 
-    // Update user with organizationId
-    // console.log('🔗 [registerAdmin] Updating user with organizationId:', newOrganization._id);
-    const updatedUser = await User.findByIdAndUpdate(
-      newUser._id,
-      { organizationId: newOrganization._id },
-      { new: true, runValidators: true }
-    );
-    // console.log('✅ [registerAdmin] User updated with organizationId');
-    // console.log('updatedUser:', updatedUser);
-    // console.log('updatedUser.organizationId:', updatedUser?.organizationId);
-
-    const userJson = updatedUser?.toJSON() || newUser.toJSON();
-    // console.log('userJson:', userJson);
+    const orgOut = newOrganization.toJSON();
 
     // console.log('🎉 [registerAdmin] Registration successful!');
     res.status(201).json({
       success: true,
       message: 'Admin and organization registered successfully',
-      data: { user: userJson, organization: newOrganization },
+      data: { user: userJson, organization: orgOut },
     });
   } catch (error) {
     console.error('❌ [registerAdmin] Error:', error);
@@ -181,7 +194,7 @@ export const registerAdmin = async (req: Request, res: Response<ApiResponse>) =>
 
 export const register = async (req: Request, res: Response<ApiResponse>) => {
   try {
-    const { name, email, password, role = 'employee', roleLabel, department, avatar, employeeId, phone, organizationId } = req.body;
+    const { name, email, password, role = 'employee', roleLabel, department, avatar, employeeId, phone, organizationId, address } = req.body;
 
     // Auto-generate missing fields
     const defaultRoleLabel: Record<string, string> = {
@@ -217,6 +230,7 @@ export const register = async (req: Request, res: Response<ApiResponse>) => {
       employeeId: generatedEmployeeId,
       phone: phone || '',
       organizationId,
+      address: address || '',
     });
 
     res.status(201).json({
@@ -531,14 +545,18 @@ export const verifyPaymentAndRegister = async (req: Request, res: Response<ApiRe
     const trialStartDate = new Date();
     const trialEndDate = new Date(trialStartDate);
     trialEndDate.setDate(trialEndDate.getDate() + 30);
-    const newOrganization = await Organization.create({
+    const orgCreateData: any = {
       name: registrationData.organizationName,
       trialStartDate,
       trialEndDate,
       isPaid: true,
       paymentDate: new Date(),
-      plan: plan || 'Basic', // Default to Basic if no plan provided
-    });
+      plan: plan || 'Basic',
+    };
+    if (registrationData.address) {
+      orgCreateData.officeLocation = { address: registrationData.address };
+    }
+    const newOrganization = await Organization.create(orgCreateData);
     // console.log('✅ Organization created:', newOrganization._id);
 
     // Create user
@@ -548,6 +566,8 @@ export const verifyPaymentAndRegister = async (req: Request, res: Response<ApiRe
       password: hashedPassword,
       role: 'hr_manager',
       organizationId: newOrganization._id,
+      address: registrationData.address || '',
+      phone: registrationData.phone || '',
     });
     // console.log('✅ User created:', newUser._id);
 
